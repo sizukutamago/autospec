@@ -1,0 +1,41 @@
+{
+  "name": "@sizukutamago/blueprint-sdk",
+  "version": "0.1.0",
+  "description": "AI workflow engine powered by Claude Agent SDK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "blueprint": "dist/cli.js",
+    "blueprint-sdk": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "oxlint --type-aware --type-check",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.47",
+    "@clack/prompts": "^1.0.1",
+    "js-yaml": "^4.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "oxlint": "latest",
+    "oxlint-tsgolint": "latest",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "files": [
+    "dist",
+    "src/prompts"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
