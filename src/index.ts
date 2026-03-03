@@ -76,8 +76,8 @@ export type { QuestionResult, ResearchTarget } from "./agents/interviewer.js";
 // Config
 export { loadConfig } from "./config/loader.js";
 export { DEFAULT_CONFIG, } from "./config/defaults.js";
-export { BlueprintConfigSchema } from "./config/schema.js";
-export type { BlueprintConfig } from "./config/schema.js";
+export { AutospecConfigSchema } from "./config/schema.js";
+export type { AutospecConfig } from "./config/schema.js";
 export { loadPromptFile, getPromptsDir } from "./config/prompt-loader.js";
 
 // Review Gate Handler

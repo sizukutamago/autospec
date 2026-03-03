@@ -17,14 +17,14 @@ export function createImplementHandler(options: ImplementHandlerOptions): StageH
     const di = loadPromptFile("defaults/di.md", projectRoot);
     const validationPatterns = loadPromptFile("defaults/validation-patterns.md", projectRoot);
 
-    // blueprint.yaml からアーキテクチャパターンを取得
+    // autospec.yaml からアーキテクチャパターンを取得
     const config = loadConfig(projectRoot);
     const archPattern = config.architecture.pattern;
     const archDoc = loadPromptFile(`defaults/architecture/${archPattern}.md`, projectRoot);
 
     const prompt = `You are working on the project at ${projectRoot}.
 Read CLAUDE.md for project requirements and conventions.
-Read .blueprint/contracts/ for YAML contract specifications.
+Read .autospec/contracts/ for YAML contract specifications.
 Read tests/ for test expectations.
 
 ## Implementation Workflow

@@ -11,7 +11,7 @@ Contract YAML に宣言された制約と実装コードの乖離、およびコ
 ## 共通入力
 
 各エージェントに以下を渡す:
-- Contract YAML ファイル（`.blueprint/contracts/**/*.contract.yaml`）
+- Contract YAML ファイル（`.autospec/contracts/**/*.contract.yaml`）
 - ソースコード（`src/`, `app/`, `routes/` 等のメインコードディレクトリ）
 - バリデーションスキーマ（Zod, Joi, Yup 等の定義ファイル）
 - テストファイル（`tests/contracts/` — 参考情報として）
@@ -208,7 +208,7 @@ Contract との一致ではなく、`core/defaults/` の実装規約への準拠
 ```
 1. レイヤー依存方向の検証:
 
-   .blueprint/config.yaml の architecture.pattern を確認し、
+   .autospec/config.yaml の architecture.pattern を確認し、
    core/defaults/architecture-patterns/{pattern}.md の依存方向ルールに基づいて:
    a. 禁止方向の import があるか:
       - Clean: domain → infra, domain → interface, usecase → infra（直接）

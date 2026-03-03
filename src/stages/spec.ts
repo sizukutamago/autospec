@@ -25,7 +25,7 @@ export function createSpecHandler(options: SpecHandlerOptions): StageHandler {
     // Plugin コア仕様をプロンプトに埋め込む
     const contractSchema = loadPromptFile("core/contract-schema.md", projectRoot);
     const specWorkflow = loadPromptFile("core/spec-workflow.md", projectRoot);
-    const blueprintStructure = loadPromptFile("core/blueprint-structure.md", projectRoot);
+    const autospecStructure = loadPromptFile("core/autospec-structure.md", projectRoot);
     const idSystem = loadPromptFile("core/id-system.md", projectRoot);
 
     const prompt = `You are working on the project at ${projectRoot}.
@@ -36,8 +36,8 @@ ${specWorkflow}
 ## Contract YAML Schema
 ${contractSchema}
 
-## .blueprint/ Directory Structure
-${blueprintStructure}
+## .autospec/ Directory Structure
+${autospecStructure}
 
 ## ID System
 ${idSystem}
@@ -45,7 +45,7 @@ ${idSystem}
 ## Project Context (from CLAUDE.md)
 ${claudeMd}
 
-Generate YAML contracts in .blueprint/contracts/ following the schema above.
+Generate YAML contracts in .autospec/contracts/ following the schema above.
 Organize contracts by type: api/, external/, files/, internal/.
 Also generate concepts/ and decisions/ as needed.`;
 

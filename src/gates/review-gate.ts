@@ -21,7 +21,7 @@ async function runWithRetry(
       return await reviewer();
     } catch (err) {
       console.error(
-        `[blueprint] Reviewer #${index + 1} attempt ${attempt + 1}/${maxRetries + 1} failed:`,
+        `[autospec] Reviewer #${index + 1} attempt ${attempt + 1}/${maxRetries + 1} failed:`,
         toErrorMessage(err),
       );
       if (attempt === maxRetries) return null;

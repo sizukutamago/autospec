@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as yaml from "js-yaml";
-import { BlueprintConfigSchema, type BlueprintConfig } from "./schema.js";
+import { AutospecConfigSchema, type AutospecConfig } from "./schema.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
 
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
@@ -20,8 +20,8 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
   return result;
 }
 
-export function loadConfig(projectRoot: string): BlueprintConfig {
-  const configPath = path.join(projectRoot, ".blueprint", "blueprint.yaml");
+export function loadConfig(projectRoot: string): AutospecConfig {
+  const configPath = path.join(projectRoot, ".autospec", "autospec.yaml");
 
   if (!fs.existsSync(configPath)) {
     return DEFAULT_CONFIG;
@@ -35,7 +35,7 @@ export function loadConfig(projectRoot: string): BlueprintConfig {
       return DEFAULT_CONFIG;
     }
 
-    const validated = BlueprintConfigSchema.safeParse(parsed);
+    const validated = AutospecConfigSchema.safeParse(parsed);
     if (!validated.success) {
       return DEFAULT_CONFIG;
     }
@@ -46,7 +46,7 @@ export function loadConfig(projectRoot: string): BlueprintConfig {
       validated.data as unknown as Record<string, unknown>,
     );
 
-    return merged as unknown as BlueprintConfig;
+    return merged as unknown as AutospecConfig;
   } catch {
     return DEFAULT_CONFIG;
   }

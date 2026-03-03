@@ -50,7 +50,7 @@ function createSmokeStageHandler(): StageHandler {
   ): Promise<StageResult> => {
     console.log("[smoke] Stage 1: Calling Claude via query()...");
     const result = await claudeQuery(
-      "Reply with exactly: 'Hello from blueprint-sdk'. Nothing else.",
+      "Reply with exactly: 'Hello from autospec'. Nothing else.",
     );
     console.log(`[smoke] Claude responded: ${result.slice(0, 200)}`);
     return { status: "completed" };
@@ -74,7 +74,7 @@ function noopHandler(name: string): StageHandler {
 async function main() {
   console.log("[smoke] E2E smoke test starting...");
 
-  const tmpDir = "/tmp/blueprint-sdk-smoke";
+  const tmpDir = "/tmp/autospec-smoke";
   const { mkdirSync } = await import("node:fs");
   mkdirSync(tmpDir, { recursive: true });
 

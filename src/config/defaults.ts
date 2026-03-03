@@ -1,4 +1,4 @@
-import type { BlueprintConfig } from "./schema.js";
+import type { AutospecConfig } from "./schema.js";
 
 export const DEFAULT_CONFIG = {
   project: {},
@@ -27,4 +27,4 @@ export const DEFAULT_CONFIG = {
     package_manager: "npm",
   },
   architecture: { pattern: "flat" as const },
-} satisfies BlueprintConfig;
+} satisfies AutospecConfig;

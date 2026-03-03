@@ -11,7 +11,7 @@
 | ENT | エンティティ | ENT-{PascalCase} | データ構造設計 | ENT-User, ENT-OrderItem |
 | ADR | 設計決定記録 | ADR-XXXX (4桁) | アーキテクチャ設計 | ADR-0001 |
 
-> CON-*, CONCEPT-*, DEC-* プレフィックスは `core/blueprint-structure.md` を参照。
+> CON-*, CONCEPT-*, DEC-* プレフィックスは `core/autospec-structure.md` を参照。
 
 ## NFR カテゴリ
 

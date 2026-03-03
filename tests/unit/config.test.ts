@@ -3,19 +3,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import {
-  BlueprintConfigSchema,
+  AutospecConfigSchema,
   loadConfig,
   DEFAULT_CONFIG,
-  type BlueprintConfig,
+  type AutospecConfig,
 } from "../../src/config/index.js";
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "config-test-"));
 }
 
-describe("BlueprintConfigSchema", () => {
+describe("AutospecConfigSchema", () => {
   it("validates a minimal config", () => {
-    const result = BlueprintConfigSchema.safeParse({});
+    const result = AutospecConfigSchema.safeParse({});
     expect(result.success).toBe(true);
   });
 
@@ -28,19 +28,19 @@ describe("BlueprintConfigSchema", () => {
       tech_stack: { framework: "none", test: "vitest" },
       architecture: { pattern: "clean" },
     };
-    const result = BlueprintConfigSchema.safeParse(config);
+    const result = AutospecConfigSchema.safeParse(config);
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid mode", () => {
-    const result = BlueprintConfigSchema.safeParse({
+    const result = AutospecConfigSchema.safeParse({
       pipeline: { mode: "invalid" },
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects invalid gate type", () => {
-    const result = BlueprintConfigSchema.safeParse({
+    const result = AutospecConfigSchema.safeParse({
       gates: { type: "invalid" },
     });
     expect(result.success).toBe(false);
@@ -66,12 +66,12 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it("reads and merges .blueprint/blueprint.yaml", () => {
+  it("reads and merges .autospec/autospec.yaml", () => {
     const tmpDir = makeTmpDir();
-    const blueprintDir = path.join(tmpDir, ".blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
+    const autospecDir = path.join(tmpDir, ".autospec");
+    fs.mkdirSync(autospecDir, { recursive: true });
     fs.writeFileSync(
-      path.join(blueprintDir, "blueprint.yaml"),
+      path.join(autospecDir, "autospec.yaml"),
       `pipeline:\n  mode: spec\n  max_turns:\n    spec: 5\n`,
     );
 
@@ -87,10 +87,10 @@ describe("loadConfig", () => {
 
   it("handles invalid YAML gracefully", () => {
     const tmpDir = makeTmpDir();
-    const blueprintDir = path.join(tmpDir, ".blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
+    const autospecDir = path.join(tmpDir, ".autospec");
+    fs.mkdirSync(autospecDir, { recursive: true });
     fs.writeFileSync(
-      path.join(blueprintDir, "blueprint.yaml"),
+      path.join(autospecDir, "autospec.yaml"),
       "{{invalid yaml",
     );
 
@@ -103,10 +103,10 @@ describe("loadConfig", () => {
 
   it("handles schema validation failure gracefully", () => {
     const tmpDir = makeTmpDir();
-    const blueprintDir = path.join(tmpDir, ".blueprint");
-    fs.mkdirSync(blueprintDir, { recursive: true });
+    const autospecDir = path.join(tmpDir, ".autospec");
+    fs.mkdirSync(autospecDir, { recursive: true });
     fs.writeFileSync(
-      path.join(blueprintDir, "blueprint.yaml"),
+      path.join(autospecDir, "autospec.yaml"),
       `pipeline:\n  mode: invalid_mode\n`,
     );
 

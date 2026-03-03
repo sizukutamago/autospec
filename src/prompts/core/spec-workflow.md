@@ -3,20 +3,20 @@
 Contract YAML をブレインストーミングから生成するワークフロー。
 ユーザーがビジネス判断、AI が構造化を担当する。
 
-> **前提**: `blueprint-structure.md` と `contract-schema.md` を参照。
+> **前提**: `autospec-structure.md` と `contract-schema.md` を参照。
 
 ## ワークフロー（7 ステップ）
 
 ### Step 1: コンテキスト読み込み
 
-`.blueprint/` ディレクトリの状態を確認する。
+`.autospec/` ディレクトリの状態を確認する。
 
-- **存在しない場合**: ディレクトリ構造を初期化（`blueprint-structure.md` の構造に従う）
+- **存在しない場合**: ディレクトリ構造を初期化（`autospec-structure.md` の構造に従う）
 - **存在する場合**: 既存の contracts, concepts, decisions を読み込んで現状を把握
 
 ```
 チェック項目:
-- .blueprint/ の存在
+- .autospec/ の存在
 - 既存 Contract の一覧と status
 - 既存 concepts の相互リンク構造
 - 既存 decisions の一覧
@@ -37,7 +37,7 @@ Contract YAML をブレインストーミングから生成するワークフロ
 
 #### config.yaml 生成（初回のみ）
 
-`.blueprint/config.yaml` が存在しない場合、プロジェクトの技術スタックを検出・確認して生成する。
+`.autospec/config.yaml` が存在しない場合、プロジェクトの技術スタックを検出・確認して生成する。
 既に存在する場合はスキップ。
 
 ```
@@ -50,7 +50,7 @@ Contract YAML をブレインストーミングから生成するワークフロ
 
 ```
 ユーザーへの提示フォーマット:
-## プロジェクト設定 (.blueprint/config.yaml)
+## プロジェクト設定 (.autospec/config.yaml)
 
 | 項目 | 検出値 | 確認 |
 |------|--------|------|
@@ -142,10 +142,10 @@ Contract YAML をブレインストーミングから生成するワークフロ
 ```
 
 **配置先**:
-- `api` → `.blueprint/contracts/api/{name}.contract.yaml`
-- `external` → `.blueprint/contracts/external/{name}.contract.yaml`
-- `file` → `.blueprint/contracts/files/{name}.contract.yaml`
-- `internal` → `.blueprint/contracts/internal/{name}.contract.yaml`
+- `api` → `.autospec/contracts/api/{name}.contract.yaml`
+- `external` → `.autospec/contracts/external/{name}.contract.yaml`
+- `file` → `.autospec/contracts/files/{name}.contract.yaml`
+- `internal` → `.autospec/contracts/internal/{name}.contract.yaml`
 
 **SemVer 初期値**: `1.0.0`（新規の場合）
 
@@ -186,7 +186,7 @@ Contract YAML をブレインストーミングから生成するワークフロ
 
 ### Step 6: 副産物生成
 
-ブレスト中に出たドメイン知識と設計判断を `.blueprint/` に書き出す。
+ブレスト中に出たドメイン知識と設計判断を `.autospec/` に書き出す。
 
 **concepts/**:
 - ブレストで登場した主要ドメイン概念ごとに 1 ファイル
@@ -206,9 +206,9 @@ Contract YAML をブレインストーミングから生成するワークフロ
 
 ```
 ## 生成ファイル
-- .blueprint/contracts/api/{name}.contract.yaml (CON-{name} v1.0.0)
-- .blueprint/concepts/{concept}.md
-- .blueprint/decisions/DEC-{NNN}-{name}.md
+- .autospec/contracts/api/{name}.contract.yaml (CON-{name} v1.0.0)
+- .autospec/concepts/{concept}.md
+- .autospec/decisions/DEC-{NNN}-{name}.md
 - ...
 
 ## 次のステップ
@@ -234,7 +234,7 @@ Contract YAML をブレインストーミングから生成するワークフロ
 
 | エラー | 対応 |
 |--------|------|
-| .blueprint/ 初期化失敗 | git root でない場合の案内、権限確認 |
+| .autospec/ 初期化失敗 | git root でない場合の案内、権限確認 |
 | ブレストが収束しない | 10 質問上限 + open_questions への退避 |
 | タイプ判定が曖昧 | ユーザーに判断を委ねる |
 | 既存 Contract との依存が不明確 | 明示的に確認、不明な場合は TODO リンクとして残す |

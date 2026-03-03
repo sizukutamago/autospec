@@ -1,17 +1,17 @@
-# blueprint-sdk
+# autospec
 
 AI-powered software development pipeline engine built on [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk).
 
-Describe what you want to build through conversation, and blueprint-sdk automatically generates specs, tests, implementation, and documentation.
+Describe what you want to build through conversation, and autospec automatically generates specs, tests, implementation, and documentation.
 
 ## Quick Start
 
 ```bash
 # Initialize project config
-npx blueprint-sdk init
+npx autospec init
 
 # Start — describe your project, press Enter to run
-npx blueprint-sdk
+npx autospec
 ```
 
 That's it. You talk, AI builds.
@@ -48,17 +48,17 @@ Each stage uses Claude to generate artifacts. Between stages, **Review Gates** c
 
 ```bash
 # Pipeline mode
-npx blueprint-sdk                   # Full: Spec → Test → Implement → Docs
-npx blueprint-sdk --mode tdd        # TDD: Spec → Test (implement yourself)
-npx blueprint-sdk --mode spec       # Spec only (design review)
+npx autospec                   # Full: Spec → Test → Implement → Docs
+npx autospec --mode tdd        # TDD: Spec → Test (implement yourself)
+npx autospec --mode spec       # Spec only (design review)
 
 # Resume & retry
-npx blueprint-sdk --resume          # Resume from failure point
-npx blueprint-sdk --resume --force  # Re-run completed pipeline
+npx autospec --resume          # Resume from failure point
+npx autospec --resume --force  # Re-run completed pipeline
 
 # Other
-npx blueprint-sdk --no-interactive  # Skip conversation, run pipeline directly
-npx blueprint-sdk --cwd /path       # Specify working directory
+npx autospec --no-interactive  # Skip conversation, run pipeline directly
+npx autospec --cwd /path       # Specify working directory
 ```
 
 ### Resume
@@ -80,10 +80,10 @@ In interactive mode, you can choose which stage to restart from.
 ## Configuration
 
 ```bash
-npx blueprint-sdk init   # Creates .blueprint/ directory
+npx autospec init   # Creates .autospec/ directory
 ```
 
-Edit `.blueprint/blueprint.yaml`:
+Edit `.autospec/autospec.yaml`:
 
 ```yaml
 gates:
@@ -103,7 +103,7 @@ gates:
 
 ## Advanced: Library Usage
 
-> For developers who want to embed blueprint-sdk into their own tools.
+> For developers who want to embed autospec into their own tools.
 
 <details>
 <summary>Programmatic API</summary>
@@ -113,7 +113,7 @@ import {
   createDefaultPipeline,
   claudeQuery,
   createInitialState,
-} from "@sizukutamago/blueprint-sdk";
+} from "@sizukutamago/autospec";
 
 const engine = createDefaultPipeline({
   queryFn: (prompt) => claudeQuery(prompt, { cwd: "./my-project" }),
@@ -137,8 +137,8 @@ console.log(result.final_status); // "completed"
 <summary>Custom Gates & Stages</summary>
 
 ```typescript
-import { createDefaultPipeline } from "@sizukutamago/blueprint-sdk";
-import type { StageHandler } from "@sizukutamago/blueprint-sdk";
+import { createDefaultPipeline } from "@sizukutamago/autospec";
+import type { StageHandler } from "@sizukutamago/autospec";
 
 const myGate: StageHandler = async (state, options) => {
   return {

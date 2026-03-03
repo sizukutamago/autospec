@@ -1,13 +1,12 @@
 {
-  "name": "@sizukutamago/blueprint-sdk",
+  "name": "@sizukutamago/autospec",
   "version": "0.1.0",
   "description": "AI workflow engine powered by Claude Agent SDK",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "blueprint": "dist/cli.js",
-    "blueprint-sdk": "dist/cli.js"
+    "autospec": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc && cp -r src/prompts dist/prompts",

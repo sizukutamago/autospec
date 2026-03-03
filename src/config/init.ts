@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as yaml from "js-yaml";
 import { DEFAULT_CONFIG } from "./defaults.js";
 
-const BLUEPRINT_DIRS = [
+const AUTOSPEC_DIRS = [
   "contracts/api",
   "contracts/external",
   "contracts/files",
@@ -13,19 +13,19 @@ const BLUEPRINT_DIRS = [
 ];
 
 /**
- * .blueprint/ ディレクトリを初期化する。
- * 既存の blueprint.yaml は上書きしない。
+ * .autospec/ ディレクトリを初期化する。
+ * 既存の autospec.yaml は上書きしない。
  */
-export function initBlueprint(projectRoot: string): void {
-  const bpDir = path.join(projectRoot, ".blueprint");
+export function initAutospec(projectRoot: string): void {
+  const bpDir = path.join(projectRoot, ".autospec");
 
   // ディレクトリ作成
-  for (const dir of BLUEPRINT_DIRS) {
+  for (const dir of AUTOSPEC_DIRS) {
     fs.mkdirSync(path.join(bpDir, dir), { recursive: true });
   }
 
-  // blueprint.yaml 生成（既存があれば上書きしない）
-  const yamlPath = path.join(bpDir, "blueprint.yaml");
+  // autospec.yaml 生成（既存があれば上書きしない）
+  const yamlPath = path.join(bpDir, "autospec.yaml");
   if (!fs.existsSync(yamlPath)) {
     const content = yaml.dump(DEFAULT_CONFIG, {
       lineWidth: 120,

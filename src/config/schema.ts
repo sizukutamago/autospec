@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const BlueprintConfigSchema = z.object({
+export const AutospecConfigSchema = z.object({
   project: z.object({
     name: z.string().optional(),
     language: z.string().optional(),
@@ -55,10 +55,10 @@ export const BlueprintConfigSchema = z.object({
   }).optional(),
 });
 
-export type BlueprintConfigInput = z.input<typeof BlueprintConfigSchema>;
+export type AutospecConfigInput = z.input<typeof AutospecConfigSchema>;
 
 /** Fully resolved config (no optionals) */
-export interface BlueprintConfig {
+export interface AutospecConfig {
   project: { name?: string; language?: string; runtime?: string };
   pipeline: {
     mode: "spec" | "tdd" | "full";

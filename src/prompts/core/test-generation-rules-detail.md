@@ -742,7 +742,7 @@ import { parse } from "yaml";
 import { resolve } from "path";
 
 export function loadContract(relativePath: string) {
-  const root = resolve(__dirname, "../../.blueprint/contracts");
+  const root = resolve(__dirname, "../../.autospec/contracts");
   const content = readFileSync(resolve(root, relativePath), "utf-8");
   return parse(content);
 }
@@ -862,7 +862,7 @@ import pytest
 import yaml
 
 def load_contract(relative_path: str) -> dict:
-    with open(f".blueprint/contracts/{relative_path}") as f:
+    with open(f".autospec/contracts/{relative_path}") as f:
         return yaml.safe_load(f)
 
 class TestOrderCreateLevel1:

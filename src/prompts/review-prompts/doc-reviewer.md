@@ -7,7 +7,7 @@
 
 各エージェントに以下を渡す:
 - `docs/` 配下の全設計書ファイルパスリスト
-- `.blueprint/contracts/` の Contract YAML（トレーサビリティ検証用）
+- `.autospec/contracts/` の Contract YAML（トレーサビリティ検証用）
 - `tests/contracts/` のテストファイル（chain 検証用）
 - `core/output-structure.md`（必須ファイル一覧参照）
 - `core/review-criteria.md`（5 段階レビュー基準参照）

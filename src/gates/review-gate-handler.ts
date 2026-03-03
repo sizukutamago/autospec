@@ -50,7 +50,7 @@ IMPORTANT: ID naming format (e.g. "int-001" vs "CON-xxx") is ALWAYS P2, never P0
 };
 
 const REVISE_TARGETS: Record<GateKind, string> = {
-  contract: "Focus on the contract YAML files in .blueprint/contracts/",
+  contract: "Focus on the contract YAML files in .autospec/contracts/",
   test: "Focus on the test files in the tests/ directory",
   code: "Focus on the source code files in src/",
   doc: "Focus on the documentation files in docs/",
@@ -182,7 +182,7 @@ function createOnRevise(
       .map((f) => `[${f.severity}] ${f.target} / ${f.field}: ${f.message}${f.suggestion ? ` → ${f.suggestion}` : ""}`)
       .join("\n");
 
-    console.error(`[blueprint] REVISE cycle ${cycle}: ${findings.length} findings を修正中...`);
+    console.error(`[autospec] REVISE cycle ${cycle}: ${findings.length} findings を修正中...`);
 
     const reviseTarget = REVISE_TARGETS[gate];
 

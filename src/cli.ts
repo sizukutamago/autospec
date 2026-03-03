@@ -16,7 +16,7 @@ import type { ConversationEntry } from "./interactive/summary.js";
 import type { PipelineOptions, PipelineState, PipelineMode, StageId, QueryFn } from "./types.js";
 import type { ResumeInfo } from "./engine.js";
 import { toErrorMessage } from "./utils/to-error-message.js";
-import { initBlueprint } from "./config/init.js";
+import { initAutospec } from "./config/init.js";
 
 const VERSION = "0.1.0";
 
@@ -78,7 +78,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
       case "--cwd": {
         const next = argv[i + 1];
         if (!next || next.startsWith("--")) {
-          console.error("[blueprint] --cwd にはディレクトリを指定してください");
+          console.error("[autospec] --cwd にはディレクトリを指定してください");
           process.exitCode = 1;
           return result;
         }
@@ -130,7 +130,7 @@ async function runInteractive(
   projectRoot: string,
   queryFn: QueryFn,
 ): Promise<void> {
-  p.intro(`blueprint v${VERSION}`);
+  p.intro(`autospec v${VERSION}`);
 
   p.note(
     [
@@ -468,17 +468,17 @@ async function runPipeline(args: RunPipelineArgs): Promise<void> {
   } catch (err) {
     const msg = toErrorMessage(err);
     p.cancel(`パイプライン失敗: ${msg}`);
-    p.log.info("npx blueprint --resume で途中から再開できます");
+    p.log.info("npx autospec --resume で途中から再開できます");
     process.exitCode = 1;
   }
 }
 
 function printResumeSummary(state: PipelineState, info: ResumeInfo): void {
-  console.log("[blueprint] ── 再開サマリー ──");
+  console.log("[autospec] ── 再開サマリー ──");
   for (const line of formatResumeSummary(state, info).split("\n")) {
-    console.log(`[blueprint] ${line}`);
+    console.log(`[autospec] ${line}`);
   }
-  console.log("[blueprint] ─────────────────");
+  console.log("[autospec] ─────────────────");
 }
 
 async function runNonInteractive(
@@ -496,32 +496,32 @@ async function runNonInteractive(
     printResumeSummary(state, info);
 
     if (info.isFullyCompleted && !args.force) {
-      console.log("[blueprint] 全てのステージが完了済みです。--force で再実行できます。");
+      console.log("[autospec] 全てのステージが完了済みです。--force で再実行できます。");
       return;
     }
   }
 
   const engine = createDefaultPipeline({ queryFn, cwd: projectRoot });
 
-  console.log(`[blueprint] パイプライン開始: ${state.started_at}`);
+  console.log(`[autospec] パイプライン開始: ${state.started_at}`);
 
   const options: PipelineOptions = {
     cwd: projectRoot,
     resume: args.resume,
     force: args.force,
     mode: args.mode ?? "full",
-    onStageStart: (stageId) => console.log(`[blueprint] ${STAGE_LABELS[stageId]}...`),
-    onStageComplete: (stageId, result) => console.log(`[blueprint] ${STAGE_LABELS[stageId]} → ${result.status}`),
+    onStageStart: (stageId) => console.log(`[autospec] ${STAGE_LABELS[stageId]}...`),
+    onStageComplete: (stageId, result) => console.log(`[autospec] ${STAGE_LABELS[stageId]} → ${result.status}`),
   };
 
   try {
     const finalState = await engine.run(state, options);
     saveState(finalState);
-    console.log(`[blueprint] パイプライン完了: ${finalState.final_status}`);
+    console.log(`[autospec] パイプライン完了: ${finalState.final_status}`);
   } catch (err) {
     const msg = toErrorMessage(err);
-    console.error(`[blueprint] パイプライン失敗: ${msg}`);
-    console.log("[blueprint] npx blueprint --resume で途中から再開できます");
+    console.error(`[autospec] パイプライン失敗: ${msg}`);
+    console.log("[autospec] npx autospec --resume で途中から再開できます");
     process.exitCode = 1;
   }
 }
@@ -530,20 +530,20 @@ async function main(): Promise<void> {
   // Claude Code のネスト起動を可能にする（プロセス起動時に1回だけ）
   delete process.env.CLAUDECODE;
 
-  // `npx blueprint init` サブコマンド
+  // `npx autospec init` サブコマンド
   if (process.argv[2] === "init") {
     const projectRoot = path.resolve(process.argv[3] ?? process.cwd());
-    initBlueprint(projectRoot);
-    console.log(`[blueprint] .blueprint/ を初期化しました: ${projectRoot}`);
+    initAutospec(projectRoot);
+    console.log(`[autospec] .autospec/ を初期化しました: ${projectRoot}`);
     return;
   }
 
   const args = parseCliArgs(process.argv.slice(2));
   const projectRoot = path.resolve(args.cwd);
 
-  // .blueprint/ がなければ自動生成
-  if (!fs.existsSync(path.join(projectRoot, ".blueprint"))) {
-    initBlueprint(projectRoot);
+  // .autospec/ がなければ自動生成
+  if (!fs.existsSync(path.join(projectRoot, ".autospec"))) {
+    initAutospec(projectRoot);
   }
 
   const queryFn: QueryFn = (prompt) => claudeQuery(prompt, { cwd: projectRoot });

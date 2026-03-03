@@ -2,7 +2,7 @@
 
 実装済みコードから設計書を `docs/` 配下に後追い生成するワークフロー。
 
-> **前提**: `core/blueprint-structure.md` と `core/doc-format-standards.md` を品質基準として参照。
+> **前提**: `core/autospec-structure.md` と `core/doc-format-standards.md` を品質基準として参照。
 
 ## ワークフロー（5 ステップ）
 
@@ -18,7 +18,7 @@
    - フレームワーク特定（React, Next.js, Hono, Express, etc.）
    - ORM 特定（Prisma, Drizzle, TypeORM, etc.）
    - テストフレームワーク特定（Vitest, Jest, pytest, etc.）
-3. .blueprint/ 読み込み
+3. .autospec/ 読み込み
    - contracts → I/O 境界の把握
    - concepts → ドメイン理解
    - decisions → 設計判断の把握
@@ -39,10 +39,10 @@
 | # | 出力ファイル | 抽出元 | 抽出方法 |
 |---|------------|--------|---------|
 | 1 | `03_architecture/architecture.md` | package.json, ディレクトリ構造, import グラフ | 依存分析、レイヤー構成推定 |
-| 2 | `03_architecture/adr.md` | `.blueprint/decisions/*.md` | 集約・フォーマット変換 |
+| 2 | `03_architecture/adr.md` | `.autospec/decisions/*.md` | 集約・フォーマット変換 |
 | 3 | `04_data_structure/data_structure.md` | ORM モデル, migration, schema | モデル定義抽出、ER 図生成 |
 | 4 | `05_api_design/api_design.md` | ルート定義, コントローラ, OpenAPI spec | エンドポイント一覧抽出 |
-| 5 | `05_api_design/integration.md` | 外部 API クライアント, `.blueprint/contracts/external/` | 外部連携仕様集約 |
+| 5 | `05_api_design/integration.md` | 外部 API クライアント, `.autospec/contracts/external/` | 外部連携仕様集約 |
 | 6 | `07_implementation/coding_standards.md` | biome/eslint 設定, コードパターン | 規約抽出、パターン分析 |
 | 7 | `07_implementation/environment.md` | docker-compose, .env.example, CI | 環境構成抽出 |
 
@@ -181,5 +181,5 @@ low 確信度のセクションは `<!-- TODO: 要確認 -->` マーカーを付
 |--------|------|
 | ソースコードなし | 対象ディレクトリの確認を促す |
 | 未知の tech stack | 汎用的な抽出ルールを適用 + ユーザーに確認 |
-| .blueprint/ なし | Contract なしでも docs/ 生成は可能（トレーサビリティ検証がスキップされる） |
+| .autospec/ なし | Contract なしでも docs/ 生成は可能（トレーサビリティ検証がスキップされる） |
 | フロントエンドなし | 画面系ファイル (06_screen_design/) をスキップ |

@@ -13,7 +13,7 @@ export function getPromptsDir(): string {
 
 /**
  * プロンプトファイルを読み込む。
- * プロジェクト側の .blueprint/facets/ に同名ファイルがあればそちらを優先（ファイル単位の上書き）。
+ * プロジェクト側の .autospec/facets/ に同名ファイルがあればそちらを優先（ファイル単位の上書き）。
  */
 export function loadPromptFile(
   relativePath: string,
@@ -21,7 +21,7 @@ export function loadPromptFile(
 ): string {
   // プロジェクト側の上書きチェック
   if (projectRoot) {
-    const projectPath = path.join(projectRoot, ".blueprint", "facets", relativePath);
+    const projectPath = path.join(projectRoot, ".autospec", "facets", relativePath);
     if (fs.existsSync(projectPath)) {
       try {
         return fs.readFileSync(projectPath, "utf-8");

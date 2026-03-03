@@ -16,7 +16,7 @@ export function createTestGenHandler(options: TestGenHandlerOptions): StageHandl
 
     const prompt = `You are working on the project at ${projectRoot}.
 Read CLAUDE.md for project requirements and conventions.
-Read the .blueprint/contracts/ directory for YAML contract specifications.
+Read the .autospec/contracts/ directory for YAML contract specifications.
 
 ## Test Generation Rules
 ${testRules}

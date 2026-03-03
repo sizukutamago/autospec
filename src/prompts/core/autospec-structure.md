@@ -1,12 +1,12 @@
-# Blueprint Structure
+# Autospec Structure
 
-`.blueprint/` ディレクトリの構造規約。
+`.autospec/` ディレクトリの構造規約。
 プロジェクトのドメイン知識・I/O 境界仕様・設計判断を管理する。
 
 ## ディレクトリ構造
 
 ```
-.blueprint/
+.autospec/
 ├── contracts/           # I/O 境界仕様（テスト強制）
 │   ├── api/             # 自社公開 API
 │   ├── external/        # 外部 API 連携
@@ -95,9 +95,9 @@ links:
 
 ## 初期化
 
-プロジェクトで初めて `.blueprint/` を使う場合:
+プロジェクトで初めて `.autospec/` を使う場合:
 
-1. `.blueprint/` ディレクトリと 3 つのサブディレクトリを作成
+1. `.autospec/` ディレクトリと 3 つのサブディレクトリを作成
 2. 最初の concept を 1 つ以上作成（ドメインの核となる概念）
 3. 最初の contract を作成（`/spec` スキルが支援）
 

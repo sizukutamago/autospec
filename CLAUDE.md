@@ -1,18 +1,18 @@
-# blueprint-sdk
+# autospec
 
 Claude Agent SDK を使った AI ワークフローエンジン。
 対話で要件を伝えるだけで、設計→テスト→実装→ドキュメントのパイプラインを自動実行する。
 
 ## 概要
 
-blueprint-plugin（Claude Code プラグイン）のワークフローを SDK ベースのライブラリに変換したもの。
+blueprint-plugin（Claude Code プラグイン）のワークフローをスタンドアロンの SDK に変換したもの。
 AI の解釈に頼らず、ステージ遷移と Gate 判定を決定論的にコードで制御する。
 
 ### クイックスタート
 
 ```bash
 # 対話モードで起動（デフォルト）
-npx blueprint-sdk
+npx autospec
 
 # 会話で要件を伝えて /go で実行
 > オンライン対戦オセロゲームを作りたい
@@ -40,15 +40,15 @@ Stage 4: Docs → Doc Review Gate
 
 ```bash
 # 対話モード（デフォルト）— 会話 → /go でパイプライン実行
-npx blueprint-sdk
+npx autospec
 
 # 非対話モード — 直接パイプライン実行
-npx blueprint-sdk --no-interactive
+npx autospec --no-interactive
 
 # オプション
-npx blueprint-sdk --resume          # 中断したパイプラインを再開
-npx blueprint-sdk --force           # 完了済みステージも強制再実行
-npx blueprint-sdk --cwd /path/to   # 作業ディレクトリ指定
+npx autospec --resume          # 中断したパイプラインを再開
+npx autospec --force           # 完了済みステージも強制再実行
+npx autospec --cwd /path/to   # 作業ディレクトリ指定
 ```
 
 ### 対話モードのコマンド
@@ -166,8 +166,8 @@ src/
 ## SDK としての使い方（ライブラリ利用）
 
 ```typescript
-import { createDefaultPipeline, claudeQuery } from "@sizukutamago/blueprint-sdk";
-import { createInitialState } from "@sizukutamago/blueprint-sdk";
+import { createDefaultPipeline, claudeQuery } from "@sizukutamago/autospec";
+import { createInitialState } from "@sizukutamago/autospec";
 
 // ワンコールでパイプラインセットアップ
 const engine = createDefaultPipeline({

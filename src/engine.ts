@@ -195,7 +195,7 @@ export class PipelineEngine {
       return reason as GateFailReason;
     }
     if (reason) {
-      console.error(`[blueprint] Unknown gate fail reason "${reason}", defaulting to "p0_found"`);
+      console.error(`[autospec] Unknown gate fail reason "${reason}", defaulting to "p0_found"`);
     }
     return "p0_found";
   }

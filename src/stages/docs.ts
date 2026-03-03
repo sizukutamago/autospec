@@ -14,7 +14,7 @@ export function createDocsHandler(options: DocsHandlerOptions): StageHandler {
 
     const prompt = `You are working on the project at ${projectRoot}.
 Read CLAUDE.md for project requirements and conventions.
-Read .blueprint/contracts/, src/, and tests/.
+Read .autospec/contracts/, src/, and tests/.
 
 ## Documentation Workflow
 ${docsWorkflow}

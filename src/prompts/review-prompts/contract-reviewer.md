@@ -13,7 +13,7 @@ Contract YAML の品質をレビューする。
 
 ## チェック対象
 
-`.blueprint/contracts/` 配下の全 YAML ファイルを読み込んでレビューする。
+`.autospec/contracts/` 配下の全 YAML ファイルを読み込んでレビューする。
 
 ---
 
