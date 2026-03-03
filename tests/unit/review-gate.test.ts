@@ -25,19 +25,19 @@ function makeReviewOutput(
   findings: Finding[],
   reviewer = "test-reviewer",
 ): ReviewOutput {
-  let p0 = 0;
-  let p1 = 0;
-  let p2 = 0;
+  let critical = 0;
+  let major = 0;
+  let minor = 0;
   for (const f of findings) {
-    if (f.severity === "P0") p0++;
-    else if (f.severity === "P1") p1++;
-    else p2++;
+    if (f.severity === "critical") critical++;
+    else if (f.severity === "major") major++;
+    else minor++;
   }
   return {
     reviewer,
     gate: "code",
     findings,
-    summary: { p0, p1, p2 },
+    summary: { critical, major, minor },
   };
 }
 
@@ -70,21 +70,21 @@ describe("runReviewGate", () => {
     });
 
     expect(result.status).toBe("passed");
-    expect(result.counts).toEqual({ p0: 0, p1: 0, p2: 0 });
+    expect(result.counts).toEqual({ critical: 0, major: 0, minor: 0 });
     expect(result.findings).toEqual([]);
     expect(result.reason).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
-  // P2 findings only → gate passes
+  // minor findings only → gate passes
   // -------------------------------------------------------------------------
-  it("passes when all findings are P2 (P2 does not fail the gate)", async () => {
+  it("passes when all findings are minor (minor does not fail the gate)", async () => {
     const r1 = makeSuccessReviewer(
-      [makeFinding("P2", { target: "A", field: "a" })],
+      [makeFinding("minor", { target: "A", field: "a" })],
       "reviewer-a",
     );
     const r2 = makeSuccessReviewer(
-      [makeFinding("P2", { target: "B", field: "b" })],
+      [makeFinding("minor", { target: "B", field: "b" })],
       "reviewer-b",
     );
 
@@ -94,18 +94,18 @@ describe("runReviewGate", () => {
     });
 
     expect(result.status).toBe("passed");
-    expect(result.counts).toEqual({ p0: 0, p1: 0, p2: 2 });
+    expect(result.counts).toEqual({ critical: 0, major: 0, minor: 2 });
     expect(result.findings).toHaveLength(2);
     expect(result.reason).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
-  // P0 finding → gate fails with reason p0_found
+  // critical finding → gate fails with reason critical_found
   // -------------------------------------------------------------------------
-  it("fails with reason p0_found when any reviewer reports a P0", async () => {
+  it("fails with reason critical_found when any reviewer reports a critical", async () => {
     const r1 = makeSuccessReviewer([], "reviewer-a");
     const r2 = makeSuccessReviewer(
-      [makeFinding("P0", { target: "Critical", field: "bug" })],
+      [makeFinding("critical", { target: "Critical", field: "bug" })],
       "reviewer-b",
     );
 
@@ -115,20 +115,20 @@ describe("runReviewGate", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.reason).toBe("p0_found");
-    expect(result.counts.p0).toBeGreaterThanOrEqual(1);
+    expect(result.reason).toBe("critical_found");
+    expect(result.counts.critical).toBeGreaterThanOrEqual(1);
   });
 
   // -------------------------------------------------------------------------
-  // P1 > 1 (default maxP1) → gate fails with reason p1_exceeded
+  // major > 1 (default maxMajor) → gate fails with reason major_exceeded
   // -------------------------------------------------------------------------
-  it("fails with p1_exceeded when P1 count exceeds default maxP1", async () => {
+  it("fails with major_exceeded when major count exceeds default maxMajor", async () => {
     const r1 = makeSuccessReviewer(
-      [makeFinding("P1", { target: "SvcA", field: "m1" })],
+      [makeFinding("major", { target: "SvcA", field: "m1" })],
       "reviewer-a",
     );
     const r2 = makeSuccessReviewer(
-      [makeFinding("P1", { target: "SvcB", field: "m2" })],
+      [makeFinding("major", { target: "SvcB", field: "m2" })],
       "reviewer-b",
     );
 
@@ -138,16 +138,16 @@ describe("runReviewGate", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.reason).toBe("p1_exceeded");
-    expect(result.counts.p1).toBe(2);
+    expect(result.reason).toBe("major_exceeded");
+    expect(result.counts.major).toBe(2);
   });
 
   // -------------------------------------------------------------------------
-  // Boundary: P1 = 1 → gate passes
+  // Boundary: major = 1 → gate passes
   // -------------------------------------------------------------------------
-  it("passes at the boundary when P1 count is exactly 1", async () => {
+  it("passes at the boundary when major count is exactly 1", async () => {
     const r1 = makeSuccessReviewer(
-      [makeFinding("P1", { target: "SvcA", field: "m1" })],
+      [makeFinding("major", { target: "SvcA", field: "m1" })],
       "reviewer-a",
     );
     const r2 = makeSuccessReviewer([], "reviewer-b");
@@ -158,7 +158,7 @@ describe("runReviewGate", () => {
     });
 
     expect(result.status).toBe("passed");
-    expect(result.counts.p1).toBe(1);
+    expect(result.counts.major).toBe(1);
     expect(result.reason).toBeUndefined();
   });
 
@@ -212,7 +212,7 @@ describe("runReviewGate", () => {
   // Deduplication: duplicate findings from multiple reviewers
   // -------------------------------------------------------------------------
   it("deduplicates findings that share the same normalization key", async () => {
-    const sharedFinding = makeFinding("P1", {
+    const sharedFinding = makeFinding("major", {
       target: "UserService",
       field: "createUser",
       impl_file: "src/user.ts",
@@ -237,7 +237,7 @@ describe("runReviewGate", () => {
 
     // Same target::field::impl_file → deduplicated to 1 finding
     expect(result.findings).toHaveLength(1);
-    expect(result.counts.p1).toBe(1);
+    expect(result.counts.major).toBe(1);
     expect(result.status).toBe("passed");
   });
 

@@ -19,17 +19,10 @@ export const AutospecConfigSchema = z.object({
   }).optional(),
 
   agents: z.object({
-    researcher: z.object({
-      enabled: z.boolean().optional(),
-      max_turns: z.number().optional(),
-    }).optional(),
-    web_researcher: z.object({
-      enabled: z.boolean().optional(),
-      max_turns: z.number().optional(),
-    }).optional(),
     interviewer: z.object({
       min_questions: z.number().optional(),
       max_questions: z.number().optional(),
+      max_turns: z.number().optional(),
     }).optional(),
   }).optional(),
 
@@ -66,9 +59,7 @@ export interface AutospecConfig {
     max_turns: { spec: number; test: number; implement: number; docs: number };
   };
   agents: {
-    researcher: { enabled: boolean; max_turns: number };
-    web_researcher: { enabled: boolean; max_turns: number };
-    interviewer: { min_questions: number; max_questions: number };
+    interviewer: { min_questions: number; max_questions: number; max_turns: number };
   };
   gates: {
     type: "review" | "noop";

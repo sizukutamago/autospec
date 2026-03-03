@@ -3,86 +3,67 @@ import { formatHistory } from "../interactive/summary.js";
 import type { ConversationEntry } from "../interactive/summary.js";
 
 const MAX_QUESTIONS = 5;
-const MIN_QUESTIONS = 2;
+const MIN_QUESTIONS = 1;
 
 const READY_TOKEN = "__READY__";
-const RESEARCH_CODE_TOKEN = "__RESEARCH_CODE:";
-const RESEARCH_WEB_TOKEN = "__RESEARCH_WEB:";
-const RESEARCH_BOTH_TOKEN = "__RESEARCH_BOTH:";
 
 const INTERVIEW_SYSTEM_PROMPT = `You are a project requirements interviewer for a software development pipeline.
-Your job is to ask ONE follow-up question at a time to gather enough information to generate a complete project specification.
+Your job is to investigate the existing project and ask ONE follow-up question at a time to gather enough information to generate a complete project specification.
 
-Rules:
-- Ask about: tech stack, key features, architecture, constraints, target users, UI/UX preferences
+## Autonomous Investigation
+
+You have access to Read, Glob, Grep, WebSearch, and WebFetch tools.
+Before asking questions, investigate the project yourself:
+- Use Glob to scan the directory structure
+- Use Read to read CLAUDE.md, package.json, tsconfig.json, and key source files
+- Use Grep to search for patterns and understand the codebase
+- Use WebSearch/WebFetch if you need to look up best practices or tech compatibility
+
+Do NOT ask questions that you can answer by reading the code.
+
+## Rules
+- Investigate first, then ask only what you cannot determine from the code
 - Ask in Japanese
 - Ask only ONE question per response
 - Keep questions short and specific
 - When you have enough information to write a complete spec, respond with EXACTLY "${READY_TOKEN}" (nothing else)
-- Usually 2-4 questions are enough. Don't over-ask.
-
-Special actions (respond with EXACTLY this format if needed):
-- "${RESEARCH_CODE_TOKEN}topic__" — request code analysis on the topic
-- "${RESEARCH_WEB_TOKEN}topic__" — request web search on the topic
-- "${RESEARCH_BOTH_TOKEN}topic__" — request both code and web research on the topic
-
-Use research actions when:
-- You need to check the existing codebase for context
-- You need to verify tech stack compatibility
-- You need to look up best practices for a specific technology
-
-The user's conversation and any research context will be provided.`;
+- Usually 1-3 questions are enough after investigation. Don't over-ask.`;
 
 function buildInterviewPrompt(
   history: ConversationEntry[],
-  researchContext?: string,
 ): string {
-  const contextSection = researchContext
-    ? `\n\n## Research Context\n${researchContext}`
-    : "";
-
-  return `${INTERVIEW_SYSTEM_PROMPT}${contextSection}
+  return `${INTERVIEW_SYSTEM_PROMPT}
 
 ## Conversation so far
 ${formatHistory(history, "\n")}
 
 Respond with ONE of:
-- A follow-up question in Japanese
-- "${READY_TOKEN}" if you have enough information
-- "${RESEARCH_CODE_TOKEN}topic__" to analyze existing code
-- "${RESEARCH_WEB_TOKEN}topic__" to search the web
-- "${RESEARCH_BOTH_TOKEN}topic__" to do both`;
+- A follow-up question in Japanese (after investigating the codebase)
+- "${READY_TOKEN}" if you have enough information`;
 }
-
-export type ResearchTarget = "code" | "web" | "both";
 
 export type QuestionResult =
   | { type: "question"; text: string }
   | { type: "ready" }
-  | { type: "limit_reached" }
-  | { type: "research_needed"; target: ResearchTarget; topic: string };
+  | { type: "limit_reached" };
 
 export async function generateFollowUpQuestion(
   history: ConversationEntry[],
   queryFn: QueryFn,
   questionCount: number,
-  researchContext?: string,
 ): Promise<QuestionResult> {
   if (questionCount >= MAX_QUESTIONS) {
     return { type: "limit_reached" };
   }
 
-  const prompt = buildInterviewPrompt(history, researchContext);
+  const prompt = buildInterviewPrompt(history);
   const response = await queryFn(prompt);
   const trimmed = response.trim();
 
   if (trimmed === READY_TOKEN) {
-    // 最低質問数に達していなければ質問を続けさせる
     if (questionCount < MIN_QUESTIONS) {
-      // READY を無視して追加質問を強制
-      const forcePrompt = buildInterviewPrompt(history, researchContext);
       const forceResponse = await queryFn(
-        `${forcePrompt}\n\nIMPORTANT: You must ask at least ${MIN_QUESTIONS - questionCount} more question(s). Do NOT respond with ${READY_TOKEN} yet.`,
+        `${prompt}\n\nIMPORTANT: You must ask at least ${MIN_QUESTIONS - questionCount} more question(s). Do NOT respond with ${READY_TOKEN} yet.`,
       );
       const forceTrimmed = forceResponse.trim();
       if (forceTrimmed !== READY_TOKEN) {
@@ -90,18 +71,6 @@ export async function generateFollowUpQuestion(
       }
     }
     return { type: "ready" };
-  }
-
-  // Research token parsing
-  for (const [token, target] of [
-    [RESEARCH_CODE_TOKEN, "code"],
-    [RESEARCH_WEB_TOKEN, "web"],
-    [RESEARCH_BOTH_TOKEN, "both"],
-  ] as const) {
-    if (trimmed.startsWith(token) && trimmed.endsWith("__")) {
-      const topic = trimmed.slice(token.length, -2);
-      return { type: "research_needed", target, topic };
-    }
   }
 
   return { type: "question", text: trimmed };

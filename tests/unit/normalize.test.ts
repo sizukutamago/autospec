@@ -11,7 +11,7 @@ import {
  */
 function makeFinding(overrides: Partial<Finding> = {}): Finding {
   return {
-    severity: "P1",
+    severity: "major",
     target: "UserService",
     field: "createUser",
     message: "Missing input validation",
@@ -47,7 +47,7 @@ describe("normalizeKey", () => {
 
   it("uses an empty string for impl_file when the field is omitted entirely", () => {
     const finding: Finding = {
-      severity: "P0",
+      severity: "critical",
       target: "PaymentService",
       field: "charge",
       message: "No retry logic",
@@ -89,14 +89,14 @@ describe("deduplicateFindings", () => {
       field: "y",
       impl_file: "b.ts",
       message: "I am first",
-      severity: "P0",
+      severity: "critical",
     });
     const second = makeFinding({
       target: "B",
       field: "y",
       impl_file: "b.ts",
       message: "I am second",
-      severity: "P2",
+      severity: "minor",
     });
 
     const result = deduplicateFindings([first, second]);
@@ -104,7 +104,7 @@ describe("deduplicateFindings", () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toBe(first);
     expect(result[0]?.message).toBe("I am first");
-    expect(result[0]?.severity).toBe("P0");
+    expect(result[0]?.severity).toBe("critical");
   });
 
   it("preserves findings with different keys", () => {

@@ -43,7 +43,7 @@ export async function runReviewGate(
   if (results.some((r) => r === null)) {
     return {
       status: "failed",
-      counts: { p0: 0, p1: 0, p2: 0 },
+      counts: { critical: 0, major: 0, minor: 0 },
       findings: [],
       reason: "quorum_not_met",
     };

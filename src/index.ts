@@ -1,5 +1,5 @@
 // Engine
-export { PipelineEngine, PIPELINE_ORDER } from "./engine.js";
+export { PipelineEngine, PIPELINE_ORDER, STAGE_NAME_MAP } from "./engine.js";
 export type { ResumeInfo } from "./engine.js";
 export { createInitialState, loadState, saveState, getStatePath } from "./state.js";
 export {
@@ -46,6 +46,7 @@ export type { CommandType, ParsedCommand } from "./interactive/commands.js";
 // Types
 export type {
   StageId,
+  StageName,
   StageStatus,
   GateStatus,
   GateCounts,
@@ -57,6 +58,7 @@ export type {
   SmartSkipState,
   PipelineState,
   PipelineMode,
+  PipelineScope,
   PipelineOptions,
   StageResult,
   StageHandler,
@@ -68,10 +70,8 @@ export type {
 // Agents
 export { runParallel } from "./agents/parallel-runner.js";
 export type { ParallelTask, ParallelResult } from "./agents/parallel-runner.js";
-export { runResearcher } from "./agents/researcher.js";
-export { runWebResearcher } from "./agents/web-researcher.js";
 export { generateFollowUpQuestion } from "./agents/interviewer.js";
-export type { QuestionResult, ResearchTarget } from "./agents/interviewer.js";
+export type { QuestionResult } from "./agents/interviewer.js";
 
 // Config
 export { loadConfig } from "./config/loader.js";

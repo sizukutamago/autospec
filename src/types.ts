@@ -19,13 +19,13 @@ export type StageStatus =
 export type GateStatus = "pending" | "passed" | "failed";
 
 export interface GateCounts {
-  p0: number;
-  p1: number;
-  p2: number;
+  critical: number;
+  major: number;
+  minor: number;
 }
 
 export interface Finding {
-  severity: "P0" | "P1" | "P2";
+  severity: "critical" | "major" | "minor";
   target: string;
   field: string;
   impl_file?: string;
@@ -95,11 +95,26 @@ export interface PipelineState {
 
 export type PipelineMode = "spec" | "tdd" | "full";
 
+/** ユーザーフレンドリーなステージ名（作業ステージ + ゲートのペア） */
+export type StageName = "spec" | "test" | "implement" | "docs";
+
+/** 部分実行スコープ */
+export interface PipelineScope {
+  /** 単一ステージのみ実行（from + to のショートカット） */
+  only?: StageName;
+  /** 指定ステージから実行開始 */
+  from?: StageName;
+  /** 指定ステージ（のゲート含む）で実行停止 */
+  to?: StageName;
+}
+
 export interface PipelineOptions {
   cwd: string;
   resume: boolean;
   force: boolean;
   mode?: PipelineMode;
+  /** 部分実行スコープ（only/from/to） - mode より優先 */
+  scope?: PipelineScope;
   /** 指定ステージから強制開始（resume 時に特定ゲートから再実行する場合） */
   startFromStage?: StageId;
   onStageStart?: (stageId: StageId) => void;
@@ -118,7 +133,7 @@ export type StageHandler = (
   options: PipelineOptions,
 ) => Promise<StageResult>;
 
-export type GateFailReason = "p0_found" | "p1_exceeded" | "quorum_not_met";
+export type GateFailReason = "critical_found" | "major_exceeded" | "quorum_not_met";
 
 export interface GateResult {
   status: "passed" | "failed";

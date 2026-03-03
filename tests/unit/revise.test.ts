@@ -31,21 +31,21 @@ function makeFinding(severity: Finding["severity"], index = 0): Finding {
 function makePassedResult(findings: Finding[] = []): GateResult {
   return {
     status: "passed",
-    counts: { p0: 0, p1: findings.filter((f) => f.severity === "P1").length, p2: 0 },
+    counts: { critical: 0, major: findings.filter((f) => f.severity === "major").length, minor: 0 },
     findings,
   };
 }
 
 function makeFailedResult(
-  reason: "p0_found" | "p1_exceeded" | "quorum_not_met",
+  reason: "critical_found" | "major_exceeded" | "quorum_not_met",
   findings: Finding[],
 ): GateResult {
   return {
     status: "failed",
     counts: {
-      p0: findings.filter((f) => f.severity === "P0").length,
-      p1: findings.filter((f) => f.severity === "P1").length,
-      p2: findings.filter((f) => f.severity === "P2").length,
+      critical: findings.filter((f) => f.severity === "critical").length,
+      major: findings.filter((f) => f.severity === "major").length,
+      minor: findings.filter((f) => f.severity === "minor").length,
     },
     findings,
     reason,
@@ -57,7 +57,7 @@ function dummyReviewer(): Promise<ReviewOutput> {
     reviewer: "test-reviewer",
     gate: "contract",
     findings: [],
-    summary: { p0: 0, p1: 0, p2: 0 },
+    summary: { critical: 0, major: 0, minor: 0 },
   });
 }
 
@@ -89,24 +89,27 @@ describe("runReviseLoop", () => {
   });
 
   // -------------------------------------------------------------------------
-  // P0 found -> immediate fail, no revise
+  // critical found -> revise then re-review (new behavior)
   // -------------------------------------------------------------------------
-  it("returns immediately with p0_found and does not call onRevise", async () => {
-    const p0Findings = [makeFinding("P0", 1)];
-    const failedResult = makeFailedResult("p0_found", p0Findings);
-    mockRunReviewGate.mockResolvedValueOnce(failedResult);
+  it("calls onRevise for critical_found and re-reviews", async () => {
+    const criticalFindings = [makeFinding("critical", 1)];
+    const failedResult = makeFailedResult("critical_found", criticalFindings);
+    const passedResult = makePassedResult();
 
-    const onRevise = vi.fn();
+    mockRunReviewGate
+      .mockResolvedValueOnce(failedResult)
+      .mockResolvedValueOnce(passedResult);
+
+    const onRevise = vi.fn().mockResolvedValue(undefined);
     const result = await runReviseLoop({
       gate: "code",
       reviewers: [dummyReviewer],
       onRevise,
     });
 
-    expect(result.status).toBe("failed");
-    expect(result.reason).toBe("p0_found");
-    expect(onRevise).not.toHaveBeenCalled();
-    expect(mockRunReviewGate).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("passed");
+    expect(onRevise).toHaveBeenCalledTimes(1);
+    expect(mockRunReviewGate).toHaveBeenCalledTimes(2);
   });
 
   // -------------------------------------------------------------------------
@@ -130,11 +133,11 @@ describe("runReviseLoop", () => {
   });
 
   // -------------------------------------------------------------------------
-  // P1 exceeded -> revise once -> second review passes
+  // major exceeded -> revise once -> second review passes
   // -------------------------------------------------------------------------
-  it("calls onRevise then re-reviews when p1_exceeded; returns passed on second attempt", async () => {
-    const p1Findings = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const failedResult = makeFailedResult("p1_exceeded", p1Findings);
+  it("calls onRevise then re-reviews when major_exceeded; returns passed on second attempt", async () => {
+    const majorFindings = [makeFinding("major", 1), makeFinding("major", 2)];
+    const failedResult = makeFailedResult("major_exceeded", majorFindings);
     const passedResult = makePassedResult();
 
     mockRunReviewGate
@@ -155,11 +158,11 @@ describe("runReviseLoop", () => {
   });
 
   // -------------------------------------------------------------------------
-  // P1 exceeded for 3 cycles, then passes on 4th review (cycle 3 revise)
+  // major exceeded for 3 cycles, then passes on 4th review (cycle 3 revise)
   // -------------------------------------------------------------------------
   it("retries up to maxCycles (default 3) and returns passed when final cycle passes", async () => {
-    const p1Findings = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const failedResult = makeFailedResult("p1_exceeded", p1Findings);
+    const majorFindings = [makeFinding("major", 1), makeFinding("major", 2)];
+    const failedResult = makeFailedResult("major_exceeded", majorFindings);
     const passedResult = makePassedResult();
 
     // Initial review fails, cycles 1-2 fail, cycle 3 passes
@@ -183,11 +186,11 @@ describe("runReviseLoop", () => {
   });
 
   // -------------------------------------------------------------------------
-  // P1 exceeded for more than maxCycles -> returns failed
+  // major exceeded for more than maxCycles -> returns failed
   // -------------------------------------------------------------------------
-  it("returns failed with p1_exceeded after exhausting maxCycles (default 3)", async () => {
-    const p1Findings = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const failedResult = makeFailedResult("p1_exceeded", p1Findings);
+  it("returns failed with major_exceeded after exhausting maxCycles (default 3)", async () => {
+    const majorFindings = [makeFinding("major", 1), makeFinding("major", 2)];
+    const failedResult = makeFailedResult("major_exceeded", majorFindings);
 
     // All 4 reviews fail (initial + 3 revise cycles)
     mockRunReviewGate
@@ -204,7 +207,7 @@ describe("runReviseLoop", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.reason).toBe("p1_exceeded");
+    expect(result.reason).toBe("major_exceeded");
     expect(onRevise).toHaveBeenCalledTimes(3);
     // 1 initial + 3 re-reviews = 4
     expect(mockRunReviewGate).toHaveBeenCalledTimes(4);
@@ -214,10 +217,10 @@ describe("runReviseLoop", () => {
   // onRevise receives findings and cycle number
   // -------------------------------------------------------------------------
   it("passes findings and cycle number to onRevise callback", async () => {
-    const p1Findings1 = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const p1Findings2 = [makeFinding("P1", 3), makeFinding("P1", 4)];
-    const failedResult1 = makeFailedResult("p1_exceeded", p1Findings1);
-    const failedResult2 = makeFailedResult("p1_exceeded", p1Findings2);
+    const majorFindings1 = [makeFinding("major", 1), makeFinding("major", 2)];
+    const majorFindings2 = [makeFinding("major", 3), makeFinding("major", 4)];
+    const failedResult1 = makeFailedResult("major_exceeded", majorFindings1);
+    const failedResult2 = makeFailedResult("major_exceeded", majorFindings2);
     const passedResult = makePassedResult();
 
     mockRunReviewGate
@@ -234,17 +237,17 @@ describe("runReviseLoop", () => {
 
     expect(onRevise).toHaveBeenCalledTimes(2);
     // Cycle 1: receives findings from initial review
-    expect(onRevise).toHaveBeenNthCalledWith(1, p1Findings1, 1);
+    expect(onRevise).toHaveBeenNthCalledWith(1, majorFindings1, 1);
     // Cycle 2: receives findings from cycle 1 review
-    expect(onRevise).toHaveBeenNthCalledWith(2, p1Findings2, 2);
+    expect(onRevise).toHaveBeenNthCalledWith(2, majorFindings2, 2);
   });
 
   // -------------------------------------------------------------------------
   // maxCycles=1 limits to a single retry
   // -------------------------------------------------------------------------
   it("respects maxCycles=1 and only retries once", async () => {
-    const p1Findings = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const failedResult = makeFailedResult("p1_exceeded", p1Findings);
+    const majorFindings = [makeFinding("major", 1), makeFinding("major", 2)];
+    const failedResult = makeFailedResult("major_exceeded", majorFindings);
 
     // Both initial and single revise fail
     mockRunReviewGate
@@ -260,7 +263,7 @@ describe("runReviseLoop", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.reason).toBe("p1_exceeded");
+    expect(result.reason).toBe("major_exceeded");
     expect(onRevise).toHaveBeenCalledTimes(1);
     // 1 initial + 1 re-review = 2
     expect(mockRunReviewGate).toHaveBeenCalledTimes(2);
@@ -270,8 +273,8 @@ describe("runReviseLoop", () => {
   // onRevise not provided -> still works (noop)
   // -------------------------------------------------------------------------
   it("works without onRevise callback (defaults to noop)", async () => {
-    const p1Findings = [makeFinding("P1", 1), makeFinding("P1", 2)];
-    const failedResult = makeFailedResult("p1_exceeded", p1Findings);
+    const majorFindings = [makeFinding("major", 1), makeFinding("major", 2)];
+    const failedResult = makeFailedResult("major_exceeded", majorFindings);
     const passedResult = makePassedResult();
 
     mockRunReviewGate

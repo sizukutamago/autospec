@@ -45,7 +45,7 @@ describe("createReviewGateHandler", () => {
       reviewer: "reviewer-1",
       gate: "contract",
       findings: [],
-      summary: { p0: 0, p1: 0, p2: 0 },
+      summary: { critical: 0, major: 0, minor: 0 },
     });
 
     const handler = createReviewGateHandler({
@@ -56,21 +56,24 @@ describe("createReviewGateHandler", () => {
     const state = createInitialState("/tmp/test");
     const result = await handler(state, DEFAULT_OPTIONS);
     expect(result.status).toBe("passed");
-    expect(result.counts).toEqual({ p0: 0, p1: 0, p2: 0 });
+    expect(result.counts).toEqual({ critical: 0, major: 0, minor: 0 });
   });
 
-  it("returns failed when P0 findings exist (no revise for P0)", async () => {
-    mockTwoPhase("Found critical issue: missing required field", {
+  it("returns failed when critical findings exist (no revise for critical)", async () => {
+    const jsonOutput = {
       reviewer: "reviewer-1",
       gate: "contract",
       findings: [{
-        severity: "P0",
+        severity: "critical",
         target: "CON-test",
         field: "input",
         message: "missing required field",
       }],
-      summary: { p0: 1, p1: 0, p2: 0 },
-    });
+      summary: { critical: 1, major: 0, minor: 0 },
+    };
+    const jsonStr = "```json\n" + JSON.stringify(jsonOutput) + "\n```";
+    // Every call returns valid JSON so that even revise-cycle re-reviews parse correctly
+    mockClaudeQuery.mockResolvedValue(jsonStr);
 
     const handler = createReviewGateHandler({
       gate: "contract",
@@ -80,7 +83,7 @@ describe("createReviewGateHandler", () => {
     const state = createInitialState("/tmp/test");
     const result = await handler(state, DEFAULT_OPTIONS);
     expect(result.status).toBe("failed");
-    expect(result.counts?.p0).toBe(1);
+    expect(result.counts?.critical).toBe(1);
   });
 
   it("returns quorum_not_met when phase 1 fails", async () => {

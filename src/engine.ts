@@ -1,5 +1,6 @@
 import type {
   StageId,
+  StageName,
   StageHandler,
   PipelineState,
   PipelineOptions,
@@ -32,6 +33,15 @@ export interface ResumeInfo {
   isFullyCompleted: boolean;
 }
 
+export const STAGE_NAME_MAP: Record<StageName, { work: StageId; gate: StageId }> = {
+  spec:      { work: "stage_1_spec",      gate: "contract_review_gate" },
+  test:      { work: "stage_2_test",      gate: "test_review_gate" },
+  implement: { work: "stage_3_implement", gate: "code_review_gate" },
+  docs:      { work: "stage_4_docs",      gate: "doc_review_gate" },
+};
+
+const STAGE_NAME_ORDER = Object.keys(STAGE_NAME_MAP) as StageName[];
+
 const MODE_STOP_AFTER: Record<PipelineMode, StageId> = {
   spec: "contract_review_gate",
   tdd: "test_review_gate",
@@ -46,12 +56,9 @@ export class PipelineEngine {
   }
 
   async run(state: PipelineState, options: PipelineOptions): Promise<PipelineState> {
-    const startIndex = options.force ? 0
-      : options.startFromStage ? PIPELINE_ORDER.indexOf(options.startFromStage)
-      : options.resume ? PipelineEngine.getResumeInfo(state).resumeIndex
-      : 0;
+    const { startIndex, stopIndex } = this.resolveExecutionRange(state, options);
 
-    for (let i = startIndex; i < PIPELINE_ORDER.length; i++) {
+    for (let i = startIndex; i <= stopIndex && i < PIPELINE_ORDER.length; i++) {
       const stageId = PIPELINE_ORDER[i]!;
 
       // blocked guard: Stage 4 に進む前に blocked > 0 を検査
@@ -109,12 +116,6 @@ export class PipelineEngine {
       }
 
       saveState(state);
-
-      // mode に応じてパイプラインを早期完了
-      const stopAfter = MODE_STOP_AFTER[options.mode ?? "full"];
-      if (stageId === stopAfter) {
-        break;
-      }
     }
 
     state.final_status = "completed";
@@ -122,6 +123,55 @@ export class PipelineEngine {
     saveState(state);
 
     return state;
+  }
+
+  private resolveDefaultStartIndex(
+    state: PipelineState,
+    options: PipelineOptions,
+  ): number {
+    if (options.force) return 0;
+    if (options.startFromStage) return PIPELINE_ORDER.indexOf(options.startFromStage);
+    if (options.resume) return PipelineEngine.getResumeInfo(state).resumeIndex;
+    return 0;
+  }
+
+  private resolveExecutionRange(
+    state: PipelineState,
+    options: PipelineOptions,
+  ): { startIndex: number; stopIndex: number } {
+    const scope = options.scope;
+
+    if (!scope) {
+      const startIndex = this.resolveDefaultStartIndex(state, options);
+      const stopAfter = MODE_STOP_AFTER[options.mode ?? "full"];
+      const stopIndex = PIPELINE_ORDER.indexOf(stopAfter);
+      return { startIndex, stopIndex };
+    }
+
+    // only は from + to のショートカット
+    const from = scope.only ?? scope.from;
+    const to = scope.only ?? scope.to;
+
+    // バリデーション: from > to は不正
+    if (from && to) {
+      const fromOrd = STAGE_NAME_ORDER.indexOf(from);
+      const toOrd = STAGE_NAME_ORDER.indexOf(to);
+      if (fromOrd > toOrd) {
+        throw new PipelineError(
+          `Invalid scope: "${from}" is after "${to}" in the pipeline order`,
+        );
+      }
+    }
+
+    const startIndex = from
+      ? PIPELINE_ORDER.indexOf(STAGE_NAME_MAP[from].work)
+      : this.resolveDefaultStartIndex(state, options);
+
+    const stopIndex = to
+      ? PIPELINE_ORDER.indexOf(STAGE_NAME_MAP[to].gate)
+      : PIPELINE_ORDER.length - 1;
+
+    return { startIndex, stopIndex };
   }
 
   static getResumeInfo(state: PipelineState): ResumeInfo {
@@ -185,8 +235,8 @@ export class PipelineEngine {
   }
 
   private static readonly VALID_GATE_FAIL_REASONS: ReadonlySet<string> = new Set<GateFailReason>([
-    "p0_found",
-    "p1_exceeded",
+    "critical_found",
+    "major_exceeded",
     "quorum_not_met",
   ]);
 
@@ -195,9 +245,9 @@ export class PipelineEngine {
       return reason as GateFailReason;
     }
     if (reason) {
-      console.error(`[autospec] Unknown gate fail reason "${reason}", defaulting to "p0_found"`);
+      console.error(`[autospec] Unknown gate fail reason "${reason}", defaulting to "critical_found"`);
     }
-    return "p0_found";
+    return "critical_found";
   }
 
   private isGate(stageId: StageId): boolean {

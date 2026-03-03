@@ -53,7 +53,7 @@ function createMockHandler(
   result?: StageResult,
 ): StageHandler {
   const defaultResult: StageResult = stageId.endsWith("_gate")
-    ? { status: "passed", counts: { p0: 0, p1: 0, p2: 0 }, findings: [] }
+    ? { status: "passed", counts: { critical: 0, major: 0, minor: 0 }, findings: [] }
     : { status: "completed" };
 
   return vi.fn(async () => {
@@ -143,8 +143,8 @@ describe("PipelineEngine", () => {
         callOrder.push("contract_review_gate");
         return {
           status: "failed" as const,
-          reason: "p0_found",
-          counts: { p0: 1, p1: 0, p2: 0 },
+          reason: "critical_found",
+          counts: { critical: 1, major: 0, minor: 0 },
           findings: [],
         };
       });
@@ -167,8 +167,8 @@ describe("PipelineEngine", () => {
         callOrder.push("contract_review_gate");
         return {
           status: "failed" as const,
-          reason: "p0_found",
-          counts: { p0: 1, p1: 0, p2: 0 },
+          reason: "critical_found",
+          counts: { critical: 1, major: 0, minor: 0 },
           findings: [],
         };
       });
@@ -204,8 +204,8 @@ describe("PipelineEngine", () => {
         callOrder.push("contract_review_gate");
         return {
           status: "failed" as const,
-          reason: "p0_found",
-          counts: { p0: 1, p1: 0, p2: 0 },
+          reason: "critical_found",
+          counts: { critical: 1, major: 0, minor: 0 },
           findings: [],
         };
       });
@@ -220,7 +220,7 @@ describe("PipelineEngine", () => {
       } catch (err) {
         expect(err).toBeInstanceOf(GateFailedError);
         const gateError = err as GateFailedError;
-        expect(gateError.reason).toBe("p0_found");
+        expect(gateError.reason).toBe("critical_found");
         expect(gateError.stage).toBe("contract_review_gate");
       }
     });
@@ -234,8 +234,8 @@ describe("PipelineEngine", () => {
         callOrder.push("contract_review_gate");
         return {
           status: "failed" as const,
-          reason: "p0_found",
-          counts: { p0: 1, p1: 0, p2: 0 },
+          reason: "critical_found",
+          counts: { critical: 1, major: 0, minor: 0 },
           findings: [],
         };
       });
@@ -735,7 +735,7 @@ describe("PipelineEngine", () => {
 
       // Gate handler that throws GateFailedError directly
       const throwingGateHandler: StageHandler = vi.fn(async () => {
-        throw new GateFailedError("contract_review_gate", "p0_found");
+        throw new GateFailedError("contract_review_gate", "critical_found");
       });
 
       registerAllHandlers(engine, callOrder, {
@@ -844,6 +844,177 @@ describe("PipelineEngine", () => {
       expect(callOrder[0]).toBe("stage_2_test");
       expect(callOrder).not.toContain("stage_1_spec");
       expect(callOrder).not.toContain("contract_review_gate");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 12. Pipeline scope (from/to/only)
+  // -------------------------------------------------------------------------
+  describe("pipeline scope (from/to/only)", () => {
+    it("scope.only='spec' runs only stage_1_spec + contract_review_gate", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { only: "spec" },
+      });
+
+      expect(callOrder).toEqual(["stage_1_spec", "contract_review_gate"]);
+      expect(state.final_status).toBe("completed");
+    });
+
+    it("scope.only='docs' runs only stage_4_docs + doc_review_gate", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { only: "docs" },
+      });
+
+      expect(callOrder).toEqual(["stage_4_docs", "doc_review_gate"]);
+      expect(state.final_status).toBe("completed");
+    });
+
+    it("scope.only='implement' runs only stage_3_implement + code_review_gate", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { only: "implement" },
+      });
+
+      expect(callOrder).toEqual(["stage_3_implement", "code_review_gate"]);
+    });
+
+    it("scope.from='test' runs from stage_2_test to the end", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { from: "test" },
+      });
+
+      expect(callOrder).toEqual([
+        "stage_2_test",
+        "test_review_gate",
+        "stage_3_implement",
+        "code_review_gate",
+        "stage_4_docs",
+        "doc_review_gate",
+      ]);
+    });
+
+    it("scope.to='test' runs from the beginning to test_review_gate", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { to: "test" },
+      });
+
+      expect(callOrder).toEqual([
+        "stage_1_spec",
+        "contract_review_gate",
+        "stage_2_test",
+        "test_review_gate",
+      ]);
+      expect(state.final_status).toBe("completed");
+    });
+
+    it("scope from='test' to='implement' runs test through code_review_gate", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        scope: { from: "test", to: "implement" },
+      });
+
+      expect(callOrder).toEqual([
+        "stage_2_test",
+        "test_review_gate",
+        "stage_3_implement",
+        "code_review_gate",
+      ]);
+    });
+
+    it("throws PipelineError when from > to in pipeline order", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await expect(
+        engine.run(state, {
+          ...DEFAULT_OPTIONS,
+          scope: { from: "docs", to: "spec" },
+        }),
+      ).rejects.toThrow(PipelineError);
+    });
+
+    it("scope takes precedence over mode", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      registerAllHandlers(engine, callOrder);
+
+      await engine.run(state, {
+        ...DEFAULT_OPTIONS,
+        mode: "spec",
+        scope: { only: "docs" },
+      });
+
+      expect(callOrder).toEqual(["stage_4_docs", "doc_review_gate"]);
+    });
+
+    it("blocked guard still fires with scope.only='docs' when blocked > 0", async () => {
+      const engine = new PipelineEngine();
+      const state = createInitialState("/tmp/test");
+      const callOrder: StageId[] = [];
+
+      state.stages.stage_3_implement.blocked = [
+        {
+          contract_id: "contract-001",
+          reason: "ambiguous_spec",
+          detail: "The spec for module X is ambiguous",
+        },
+      ];
+
+      registerAllHandlers(engine, callOrder);
+
+      await expect(
+        engine.run(state, {
+          ...DEFAULT_OPTIONS,
+          scope: { only: "docs" },
+        }),
+      ).rejects.toThrow(PipelineError);
+
+      expect(callOrder).toEqual([]);
     });
   });
 });

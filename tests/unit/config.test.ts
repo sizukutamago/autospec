@@ -23,7 +23,7 @@ describe("AutospecConfigSchema", () => {
     const config = {
       project: { name: "test", language: "typescript", runtime: "node" },
       pipeline: { mode: "full", smart_skip: true, max_turns: { spec: 8 } },
-      agents: { researcher: { enabled: true, max_turns: 5 } },
+      agents: { interviewer: { min_questions: 1, max_turns: 10 } },
       gates: { type: "review", review: { contract_reviewers: 3 } },
       tech_stack: { framework: "none", test: "vitest" },
       architecture: { pattern: "clean" },
@@ -54,7 +54,8 @@ describe("DEFAULT_CONFIG", () => {
     expect(DEFAULT_CONFIG.pipeline.max_turns.spec).toBe(8);
     expect(DEFAULT_CONFIG.pipeline.max_turns.implement).toBe(12);
     expect(DEFAULT_CONFIG.gates.type).toBe("review");
-    expect(DEFAULT_CONFIG.agents.interviewer.min_questions).toBe(2);
+    expect(DEFAULT_CONFIG.agents.interviewer.min_questions).toBe(1);
+    expect(DEFAULT_CONFIG.agents.interviewer.max_turns).toBe(10);
   });
 });
 

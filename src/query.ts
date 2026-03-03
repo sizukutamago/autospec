@@ -59,18 +59,23 @@ async function runStream(
   });
 
   let lastText = "";
+  let turnCount = 0;
   for await (const msg of conversation) {
     if (msg.type === "result" && "subtype" in msg) {
+      console.error(`[autospec:query] ${label} finished: subtype=${msg.subtype}, turns=${turnCount}`);
       if (msg.subtype === "success") {
         const r = msg as Record<string, unknown>;
+        const text = typeof r["result"] === "string" ? r["result"] : "";
+        console.error(`[autospec:query] ${label} result (${text.length} chars): ${text.slice(0, 200)}...`);
         return {
-          text: typeof r["result"] === "string" ? r["result"] : "",
+          text,
           structuredOutput: r["structured_output"],
         };
       }
       // error_max_turns: Claude did work but hit turn limit.
       // Return lastText if available (partial success).
       if (msg.subtype === "error_max_turns" && lastText) {
+        console.error(`[autospec:query] ${label} hit max_turns (${options.maxTurns}), returning partial text (${lastText.length} chars)`);
         return { text: lastText };
       }
       // Other non-success results — treat as failure
@@ -81,6 +86,7 @@ async function runStream(
       throw new Error(`${label} failed: ${errorMsg}`);
     }
     if (msg.type === "assistant" && "message" in msg) {
+      turnCount++;
       const content = (msg.message as { content?: unknown[] })?.content;
       if (Array.isArray(content)) {
         for (const block of content) {

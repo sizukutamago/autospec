@@ -70,7 +70,7 @@ describe("createDefaultPipeline", () => {
 
     const customGate: StageHandler = vi.fn().mockResolvedValue({
       status: "passed",
-      counts: { p0: 0, p1: 1, p2: 3 },
+      counts: { critical: 0, major: 1, minor: 3 },
       findings: [],
     });
 
@@ -88,7 +88,7 @@ describe("createDefaultPipeline", () => {
     const finalState = await engine.run(state, options);
 
     expect(customGate).toHaveBeenCalledOnce();
-    expect(finalState.stages.contract_review_gate.final_counts.p1).toBe(1);
+    expect(finalState.stages.contract_review_gate.final_counts.major).toBe(1);
 
     fs.rmSync(tmpDir, { recursive: true });
   });

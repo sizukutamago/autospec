@@ -3,7 +3,7 @@ import type { ReviewOutput } from "../types.js";
 import { StructuredOutputError } from "../errors.js";
 
 export const FindingSchema = z.object({
-  severity: z.enum(["P0", "P1", "P2"]),
+  severity: z.enum(["critical", "major", "minor"]),
   target: z.string(),
   field: z.string(),
   impl_file: z.string().optional(),
@@ -19,9 +19,9 @@ export const FindingSchema = z.object({
 });
 
 const GateCountsSchema = z.object({
-  p0: z.number(),
-  p1: z.number(),
-  p2: z.number(),
+  critical: z.number(),
+  major: z.number(),
+  minor: z.number(),
 });
 
 export const ReviewOutputSchema = z.object({

@@ -9,11 +9,8 @@ import { PipelineEngine, PIPELINE_ORDER } from "./engine.js";
 import { claudeQuery } from "./query.js";
 import { generateTaskDescription } from "./interactive/summary.js";
 import { generateFollowUpQuestion } from "./agents/interviewer.js";
-import { runResearcher } from "./agents/researcher.js";
-import { runWebResearcher } from "./agents/web-researcher.js";
-import { runParallel } from "./agents/parallel-runner.js";
 import type { ConversationEntry } from "./interactive/summary.js";
-import type { PipelineOptions, PipelineState, PipelineMode, StageId, QueryFn } from "./types.js";
+import type { PipelineOptions, PipelineScope, PipelineState, PipelineMode, StageName, StageId, QueryFn } from "./types.js";
 import type { ResumeInfo } from "./engine.js";
 import { toErrorMessage } from "./utils/to-error-message.js";
 import { initAutospec } from "./config/init.js";
@@ -46,7 +43,12 @@ export interface CliArgs {
   force: boolean;
   interactive: boolean;
   mode?: PipelineMode;
+  only?: StageName;
+  from?: StageName;
+  to?: StageName;
 }
+
+const VALID_STAGE_NAMES = new Set<string>(["spec", "test", "implement", "docs"]);
 
 export function parseCliArgs(argv: string[]): CliArgs {
   const result: CliArgs = {
@@ -84,6 +86,30 @@ export function parseCliArgs(argv: string[]): CliArgs {
         }
         result.cwd = next;
         i++;
+        break;
+      }
+      case "--only": {
+        const v = argv[i + 1];
+        if (v && VALID_STAGE_NAMES.has(v)) {
+          result.only = v as StageName;
+          i++;
+        }
+        break;
+      }
+      case "--from": {
+        const v = argv[i + 1];
+        if (v && VALID_STAGE_NAMES.has(v)) {
+          result.from = v as StageName;
+          i++;
+        }
+        break;
+      }
+      case "--to": {
+        const v = argv[i + 1];
+        if (v && VALID_STAGE_NAMES.has(v)) {
+          result.to = v as StageName;
+          i++;
+        }
         break;
       }
     }
@@ -253,6 +279,7 @@ async function runInteractive(
         force: args.force,
         mode,
         startFromStage,
+        scope: buildScope(args),
       });
       return;
     }
@@ -278,39 +305,24 @@ async function runInteractive(
     { role: "user", content: firstInput.trim() },
   ];
 
-  // Step 2: 初回プロジェクト調査
-  const initialResearchSpinner = p.spinner();
-  initialResearchSpinner.start("プロジェクトを調査中...");
-
-  let researchContext = "";
-  try {
-    const researchResults = await runParallel([
-      { name: "code", fn: () => runResearcher(projectRoot) },
-      { name: "web", fn: () => runWebResearcher(firstInput.trim()) },
-    ]);
-    researchContext = researchResults
-      .filter((r) => r.result)
-      .map((r) => `[${r.name}] ${r.result}`)
-      .join("\n\n");
-    initialResearchSpinner.stop("調査完了");
-  } catch {
-    initialResearchSpinner.stop("調査をスキップ");
-  }
-
-  // Step 3: AI 深掘りループ（インタビュー用は軽量 queryFn）
+  // Step 2: AI インタビューループ（エージェントが自律的にコード調査 + 質問）
   const interviewQueryFn: QueryFn = (prompt) =>
-    claudeQuery(prompt, { cwd: projectRoot, maxTurns: 1 });
+    claudeQuery(prompt, {
+      cwd: projectRoot,
+      maxTurns: 10,
+      tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
+    });
 
   let questionCount = 0;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const thinkSpinner = p.spinner();
-    thinkSpinner.start("考え中...");
+    thinkSpinner.start("プロジェクトを調査中...");
 
     let result;
     try {
-      result = await generateFollowUpQuestion(history, interviewQueryFn, questionCount, researchContext);
+      result = await generateFollowUpQuestion(history, interviewQueryFn, questionCount);
     } catch {
       thinkSpinner.stop("質問生成をスキップ");
       break;
@@ -341,37 +353,6 @@ async function runInteractive(
         continue;
       }
       break;
-    }
-
-    if (result.type === "research_needed") {
-      thinkSpinner.stop("");
-      const researchSpinner = p.spinner();
-      const label = result.target === "code" ? "コード調査中..."
-        : result.target === "web" ? "Web検索中..."
-        : "コード調査 + Web検索中...";
-      researchSpinner.start(label);
-
-      try {
-        const tasks = [];
-        if (result.target === "code" || result.target === "both") {
-          tasks.push({ name: "code", fn: () => runResearcher(projectRoot, result.topic) });
-        }
-        if (result.target === "web" || result.target === "both") {
-          tasks.push({ name: "web", fn: () => runWebResearcher(result.topic) });
-        }
-        const researchResults = await runParallel(tasks);
-        const newContext = researchResults
-          .filter((r) => r.result)
-          .map((r) => `[${r.name}] ${r.result}`)
-          .join("\n\n");
-        if (newContext) {
-          researchContext += `\n\n${newContext}`;
-        }
-        researchSpinner.stop("調査完了");
-      } catch {
-        researchSpinner.stop("調査をスキップ");
-      }
-      continue; // 調査結果を踏まえて再度 Interviewer に聞く
     }
 
     // type === "question"
@@ -406,13 +387,20 @@ async function runInteractive(
     process.exit(0);
   }
 
-  // Step 4: 要約生成
+  // Step 4: 要約生成（コードを参照しながら正確な要約を生成）
   const summarySpinner = p.spinner();
   summarySpinner.start("タスク説明を生成中...");
 
+  const summaryQueryFn: QueryFn = (prompt) =>
+    claudeQuery(prompt, {
+      cwd: projectRoot,
+      maxTurns: 10,
+      tools: ["Read", "Glob", "Grep"],
+    });
+
   let taskDescription: string;
   try {
-    taskDescription = await generateTaskDescription(history, queryFn);
+    taskDescription = await generateTaskDescription(history, summaryQueryFn);
     summarySpinner.stop("タスク説明の生成完了");
   } catch (err) {
     const msg = toErrorMessage(err);
@@ -431,7 +419,14 @@ async function runInteractive(
     force: args.force,
     mode,
     taskDescription,
+    scope: buildScope(args),
   });
+}
+
+function buildScope(args: CliArgs): PipelineScope | undefined {
+  if (args.only) return { only: args.only };
+  if (args.from || args.to) return { from: args.from, to: args.to };
+  return undefined;
 }
 
 interface RunPipelineArgs {
@@ -443,10 +438,11 @@ interface RunPipelineArgs {
   mode: PipelineMode;
   taskDescription?: string;
   startFromStage?: StageId;
+  scope?: PipelineScope;
 }
 
 async function runPipeline(args: RunPipelineArgs): Promise<void> {
-  const { projectRoot, queryFn, state, mode, taskDescription, startFromStage } = args;
+  const { projectRoot, queryFn, state, mode, taskDescription, startFromStage, scope } = args;
 
   const engine = createDefaultPipeline({ queryFn, cwd: projectRoot, taskDescription });
   const stageSpinner = p.spinner({ indicator: "timer" });
@@ -456,6 +452,7 @@ async function runPipeline(args: RunPipelineArgs): Promise<void> {
     resume: args.resume,
     force: args.force,
     mode,
+    scope,
     startFromStage,
     onStageStart: (stageId) => stageSpinner.start(`${STAGE_LABELS[stageId]}...`),
     onStageComplete: (stageId, result) => stageSpinner.stop(`${STAGE_LABELS[stageId]} → ${statusLabel(result.status)}`),
@@ -510,6 +507,7 @@ async function runNonInteractive(
     resume: args.resume,
     force: args.force,
     mode: args.mode ?? "full",
+    scope: buildScope(args),
     onStageStart: (stageId) => console.log(`[autospec] ${STAGE_LABELS[stageId]}...`),
     onStageComplete: (stageId, result) => console.log(`[autospec] ${STAGE_LABELS[stageId]} → ${result.status}`),
   };

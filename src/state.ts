@@ -23,13 +23,13 @@ export function createInitialState(projectRoot: string): PipelineState {
       contract_review_gate: {
         status: "pending",
         cycles: 0,
-        final_counts: { p0: 0, p1: 0, p2: 0 },
+        final_counts: { critical: 0, major: 0, minor: 0 },
       },
       stage_2_test: { status: "pending" },
       test_review_gate: {
         status: "pending",
         cycles: 0,
-        final_counts: { p0: 0, p1: 0, p2: 0 },
+        final_counts: { critical: 0, major: 0, minor: 0 },
       },
       stage_3_implement: {
         status: "pending",
@@ -38,13 +38,13 @@ export function createInitialState(projectRoot: string): PipelineState {
       code_review_gate: {
         status: "pending",
         cycles: 0,
-        final_counts: { p0: 0, p1: 0, p2: 0 },
+        final_counts: { critical: 0, major: 0, minor: 0 },
       },
       stage_4_docs: { status: "pending" },
       doc_review_gate: {
         status: "pending",
         cycles: 0,
-        final_counts: { p0: 0, p1: 0, p2: 0 },
+        final_counts: { critical: 0, major: 0, minor: 0 },
       },
     },
   };

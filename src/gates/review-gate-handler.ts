@@ -31,22 +31,22 @@ type GateKind = ReviewGateHandlerOptions["gate"];
 
 const SEVERITY_RULES: Record<GateKind, string> = {
   contract: `STRICT SEVERITY RULES — you MUST follow these exactly:
-- P0: ONLY for YAML parse failures or completely missing id field (id key absent)
-- P1: Missing type info, missing returns, ambiguous specs that prevent test generation
-- P2: Naming conventions (e.g. CON-* prefix), missing metadata (version/status/owner), style issues
-IMPORTANT: ID naming format (e.g. "int-001" vs "CON-xxx") is ALWAYS P2, never P0.`,
+- critical: ONLY for YAML parse failures or completely missing id field (id key absent)
+- major: Missing type info, missing returns, ambiguous specs that prevent test generation
+- minor: Naming conventions (e.g. CON-* prefix), missing metadata (version/status/owner), style issues
+IMPORTANT: ID naming format (e.g. "int-001" vs "CON-xxx") is ALWAYS minor, never critical.`,
   test: `STRICT SEVERITY RULES — you MUST follow these exactly:
-- P0: Test file fails to compile or has syntax errors
-- P1: Missing test coverage for critical paths, incorrect assertions, missing edge cases
-- P2: Test naming conventions, missing descriptions, code style issues`,
+- critical: Test file fails to compile or has syntax errors
+- major: Missing test coverage for critical paths, incorrect assertions, missing edge cases
+- minor: Test naming conventions, missing descriptions, code style issues`,
   code: `STRICT SEVERITY RULES — you MUST follow these exactly:
-- P0: Runtime crashes, security vulnerabilities, data corruption risks
-- P1: Logic errors, missing error handling, contract violations, type safety issues
-- P2: Code style, naming conventions, minor refactoring suggestions`,
+- critical: Runtime crashes, security vulnerabilities, data corruption risks
+- major: Logic errors, missing error handling, contract violations, type safety issues
+- minor: Code style, naming conventions, minor refactoring suggestions`,
   doc: `STRICT SEVERITY RULES — you MUST follow these exactly:
-- P0: Documentation references non-existent APIs or contains dangerous instructions
-- P1: Missing documentation for public APIs, incorrect usage examples, outdated information
-- P2: Typos, formatting issues, style inconsistencies`,
+- critical: Documentation references non-existent APIs or contains dangerous instructions
+- major: Missing documentation for public APIs, incorrect usage examples, outdated information
+- minor: Typos, formatting issues, style inconsistencies`,
 };
 
 const REVISE_TARGETS: Record<GateKind, string> = {
@@ -67,20 +67,20 @@ CRITICAL: Output ONLY a JSON code block. No other text before or after.
   "gate": "<gate name>",
   "findings": [
     {
-      "severity": "P0 or P1 or P2",
+      "severity": "critical or major or minor",
       "target": "contract ID or file path",
       "field": "field name",
       "message": "issue description",
       "suggestion": "fix suggestion"
     }
   ],
-  "summary": { "p0": <count>, "p1": <count>, "p2": <count> }
+  "summary": { "critical": <count>, "major": <count>, "minor": <count> }
 }
 \`\`\`
 
 If the review found NO issues, output:
 \`\`\`json
-{"reviewer":"<name>","gate":"<gate>","findings":[],"summary":{"p0":0,"p1":0,"p2":0}}
+{"reviewer":"<name>","gate":"<gate>","findings":[],"summary":{"critical":0,"major":0,"minor":0}}
 \`\`\`
 `;
 
@@ -113,7 +113,7 @@ ${severityRules}
 If there are no issues, explicitly state that no issues were found.`,
       {
         cwd: projectRoot,
-        maxTurns: 5,
+        maxTurns: 15,
         tools: ["Read", "Glob", "Grep"],
       },
     );
@@ -177,12 +177,15 @@ function createOnRevise(
   queryFn: (prompt: string, options?: ClaudeQueryOptions) => Promise<string>,
 ): (findings: Finding[], cycle: number) => Promise<void> {
   return async (findings, cycle) => {
-    const findingsSummary = findings
-      .filter((f) => f.severity === "P0" || f.severity === "P1")
+    const actionableFindings = findings.filter((f) => f.severity === "critical" || f.severity === "major");
+    const findingsSummary = actionableFindings
       .map((f) => `[${f.severity}] ${f.target} / ${f.field}: ${f.message}${f.suggestion ? ` → ${f.suggestion}` : ""}`)
       .join("\n");
 
-    console.error(`[autospec] REVISE cycle ${cycle}: ${findings.length} findings を修正中...`);
+    // critical/major 件数に応じて maxTurns を動的調整（最低 15、1件あたり +2ターン）
+    const reviseTurns = Math.max(15, 10 + actionableFindings.length * 2);
+
+    console.error(`[autospec] REVISE cycle ${cycle}: ${actionableFindings.length} critical/major findings を修正中... (maxTurns=${reviseTurns})`);
 
     const reviseTarget = REVISE_TARGETS[gate];
 
@@ -191,9 +194,9 @@ function createOnRevise(
 The project is at: ${projectRoot}
 
 The following review findings need to be addressed by modifying the relevant files.
-Fix ALL P0 and P1 issues. P2 issues are optional but appreciated.
+Fix ALL critical and major issues. minor issues are optional but appreciated.
 
-Findings to fix:
+${actionableFindings.length} findings to fix:
 ${findingsSummary}
 
 Instructions:
@@ -201,10 +204,11 @@ Instructions:
 - Edit the files to address each finding
 - ${reviseTarget}
 - Do NOT create new files unless absolutely necessary
-- Make minimal, targeted changes`,
+- Make minimal, targeted changes
+- Be efficient: batch multiple edits to the same file together`,
       {
         cwd: projectRoot,
-        maxTurns: 8,
+        maxTurns: reviseTurns,
         tools: ["Read", "Glob", "Grep", "Edit", "Write"],
         permissionMode: "bypassPermissions",
       },
@@ -243,7 +247,7 @@ export function createReviewGateHandler(
     } catch (err) {
       return {
         status: "failed",
-        counts: { p0: 0, p1: 0, p2: 0 },
+        counts: { critical: 0, major: 0, minor: 0 },
         findings: [],
         reason: toErrorMessage(err),
       };

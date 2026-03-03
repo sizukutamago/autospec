@@ -23,10 +23,10 @@ type WorkStageId =
 
 /** 各ステージの maxTurns デフォルト値 */
 const STAGE_MAX_TURNS: Record<WorkStageId, number> = {
-  stage_1_spec: 8,
-  stage_2_test: 8,
-  stage_3_implement: 12,
-  stage_4_docs: 5,
+  stage_1_spec: 25,
+  stage_2_test: 20,
+  stage_3_implement: 30,
+  stage_4_docs: 15,
 };
 
 export interface DefaultPipelineOptions {

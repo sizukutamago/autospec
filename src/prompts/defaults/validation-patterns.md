@@ -9,30 +9,30 @@ Implementer がスキーマを生成し、Code Review Gate（Schema Compliance C
 
 | Contract 制約 | 変換先 | 欠落時 severity | 値不一致時 severity |
 |---------------|--------|----------------|-------------------|
-| `type: string` | 文字列バリデーション | P1 | P1 |
-| `type: integer` | 整数バリデーション（`.int()` 相当） | P1 | P1 |
-| `type: number` | 数値バリデーション | P1 | P1 |
-| `type: boolean` | 真偽値バリデーション | P1 | P1 |
-| `type: array` | 配列バリデーション（items の型も再帰適用） | P1 | P1 |
-| `type: object` | オブジェクトバリデーション（properties を再帰適用） | P1 | P1 |
-| `required: true` | 必須フィールド（`.optional()` 禁止） | P1 | — |
+| `type: string` | 文字列バリデーション | major | major |
+| `type: integer` | 整数バリデーション（`.int()` 相当） | major | major |
+| `type: number` | 数値バリデーション | major | major |
+| `type: boolean` | 真偽値バリデーション | major | major |
+| `type: array` | 配列バリデーション（items の型も再帰適用） | major | major |
+| `type: object` | オブジェクトバリデーション（properties を再帰適用） | major | major |
+| `required: true` | 必須フィールド（`.optional()` 禁止） | major | — |
 | `required: false` | オプショナルフィールド | — | — |
-| `min` | 最小値制約（数値）/ 最小長（文字列）/ 最小要素数（配列） | P1 | **P0** |
-| `max` | 最大値制約（数値）/ 最大長（文字列）/ 最大要素数（配列） | P1 | **P0** |
-| `pattern` | 正規表現バリデーション | P1 | **P0** |
-| `enum` | 列挙値リスト（値の過不足は P0） | P1 | **P0** |
-| `default` | デフォルト値設定 | P2 | P1 |
-| `value` (固定値) | ハードコード値 or 設定値 | P1 | **P0** |
-| `format: email` | メール形式バリデーション | P1 | — |
-| `format: uuid` | UUID 形式バリデーション | P1 | — |
-| `format: date` | 日付形式バリデーション | P1 | — |
-| `format: url` | URL 形式バリデーション | P1 | — |
+| `min` | 最小値制約（数値）/ 最小長（文字列）/ 最小要素数（配列） | major | **critical** |
+| `max` | 最大値制約（数値）/ 最大長（文字列）/ 最大要素数（配列） | major | **critical** |
+| `pattern` | 正規表現バリデーション | major | **critical** |
+| `enum` | 列挙値リスト（値の過不足は critical） | major | **critical** |
+| `default` | デフォルト値設定 | minor | major |
+| `value` (固定値) | ハードコード値 or 設定値 | major | **critical** |
+| `format: email` | メール形式バリデーション | major | — |
+| `format: uuid` | UUID 形式バリデーション | major | — |
+| `format: date` | 日付形式バリデーション | major | — |
+| `format: url` | URL 形式バリデーション | major | — |
 
 ## severity の基準
 
-- **P0（値の不一致）**: Contract が `max: 99` と宣言しているのに実装が `max: 100` → ビジネスルール違反
-- **P1（制約の欠落）**: Contract が `min: 1` と宣言しているのに実装に min チェックがない → バリデーション漏れ
-- **P2（デフォルト値の欠落）**: 動作に影響するが、未設定でもエラーにはならない
+- **critical（値の不一致）**: Contract が `max: 99` と宣言しているのに実装が `max: 100` → ビジネスルール違反
+- **major（制約の欠落）**: Contract が `min: 1` と宣言しているのに実装に min チェックがない → バリデーション漏れ
+- **minor（デフォルト値の欠落）**: 動作に影響するが、未設定でもエラーにはならない
 
 ## ネスト構造の扱い
 

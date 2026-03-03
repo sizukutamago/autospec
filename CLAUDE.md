@@ -31,9 +31,10 @@ Stage 4: Docs → Doc Review Gate
 
 ### Gate ポリシー
 
-- **P0 = 0 かつ P1 ≤ 1** → PASS
-- P0 > 0 → 即時停止（reason: `p0_found`）
-- P1 > 1 → REVISE（最大3サイクル、超過で `p1_exceeded`）
+- **critical = 0 かつ major ≤ 1** → PASS
+- critical > 0 → REVISE（自動修正→再レビュー、最大5サイクル、reason: `critical_found`）
+- major > 1 → REVISE（自動修正→再レビュー、最大5サイクル、reason: `major_exceeded`）
+- minor → 記録のみ、通過に影響しない
 - レビュアー失敗 → リトライ1回 → Gate 不成立（`quorum_not_met`）
 
 ## CLI 使い方

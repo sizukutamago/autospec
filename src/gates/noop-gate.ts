@@ -4,7 +4,7 @@ export function createNoopGateHandler(): StageHandler {
   return async (): Promise<StageResult> => {
     return {
       status: "passed",
-      counts: { p0: 0, p1: 0, p2: 0 },
+      counts: { critical: 0, major: 0, minor: 0 },
       findings: [],
     };
   };

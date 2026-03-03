@@ -12,7 +12,7 @@ import { StructuredOutputError } from "../../src/errors.js";
 
 function validFinding() {
   return {
-    severity: "P0" as const,
+    severity: "critical" as const,
     target: "src/api/handler.ts",
     field: "error_handling",
     message: "Unhandled promise rejection in request handler",
@@ -21,7 +21,7 @@ function validFinding() {
 
 function validFindingWithOptionals() {
   return {
-    severity: "P1" as const,
+    severity: "major" as const,
     target: "src/api/handler.ts",
     field: "error_handling",
     impl_file: "src/api/handler.impl.ts",
@@ -30,7 +30,7 @@ function validFindingWithOptionals() {
     disposition: "wont_fix" as const,
     disposition_reason: "Accepted risk for MVP",
     deferred_to: null,
-    original_severity: "P0",
+    original_severity: "critical",
   };
 }
 
@@ -39,7 +39,7 @@ function validReviewOutput() {
     reviewer: "contract-reviewer",
     gate: "contract" as const,
     findings: [validFinding()],
-    summary: { p0: 1, p1: 0, p2: 0 },
+    summary: { critical: 1, major: 0, minor: 0 },
   };
 }
 
@@ -95,7 +95,7 @@ describe("FindingSchema", () => {
       expect(result.data.disposition).toBe("wont_fix");
       expect(result.data.disposition_reason).toBe("Accepted risk for MVP");
       expect(result.data.deferred_to).toBeNull();
-      expect(result.data.original_severity).toBe("P0");
+      expect(result.data.original_severity).toBe("critical");
     }
   });
 
@@ -112,7 +112,7 @@ describe("FindingSchema", () => {
   });
 
   it("accepts all valid severity levels", () => {
-    for (const severity of ["P0", "P1", "P2"] as const) {
+    for (const severity of ["critical", "major", "minor"] as const) {
       const finding = { ...validFinding(), severity };
       const result = FindingSchema.safeParse(finding);
       expect(result.success).toBe(true);
@@ -132,7 +132,7 @@ describe("ReviewOutputSchema", () => {
       expect(result.data.reviewer).toBe("contract-reviewer");
       expect(result.data.gate).toBe("contract");
       expect(result.data.findings).toHaveLength(1);
-      expect(result.data.summary).toEqual({ p0: 1, p1: 0, p2: 0 });
+      expect(result.data.summary).toEqual({ critical: 1, major: 0, minor: 0 });
     }
   });
 
@@ -183,7 +183,7 @@ describe("ReviewOutputSchema", () => {
   it("rejects summary with missing count field", () => {
     const output = {
       ...validReviewOutput(),
-      summary: { p0: 1, p1: 0 }, // missing p2
+      summary: { critical: 1, major: 0 }, // missing minor
     };
     const result = ReviewOutputSchema.safeParse(output);
     expect(result.success).toBe(false);
@@ -192,7 +192,7 @@ describe("ReviewOutputSchema", () => {
   it("rejects summary with non-number count", () => {
     const output = {
       ...validReviewOutput(),
-      summary: { p0: "one", p1: 0, p2: 0 },
+      summary: { critical: "one", major: 0, minor: 0 },
     };
     const result = ReviewOutputSchema.safeParse(output);
     expect(result.success).toBe(false);
@@ -224,7 +224,7 @@ describe("parseReviewOutput", () => {
     expect(result.reviewer).toBe("contract-reviewer");
     expect(result.gate).toBe("contract");
     expect(Array.isArray(result.findings)).toBe(true);
-    expect(typeof result.summary.p0).toBe("number");
+    expect(typeof result.summary.critical).toBe("number");
   });
 
   it("throws StructuredOutputError on completely invalid data", () => {

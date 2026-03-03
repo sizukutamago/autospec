@@ -21,7 +21,7 @@ describe("createNoopGateHandler", () => {
     const result = await handler(state, options);
 
     expect(result.status).toBe("passed");
-    expect(result.counts).toEqual({ p0: 0, p1: 0, p2: 0 });
+    expect(result.counts).toEqual({ critical: 0, major: 0, minor: 0 });
   });
 
   it("returns empty findings array", async () => {

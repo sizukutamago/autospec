@@ -174,19 +174,19 @@ it("items が未送信の場合はエラー", () => {
 
 #### `required: true` + `default` の矛盾検出
 
-Contract で同一フィールドに `required: true` と `default` が両方指定されている場合、**論理矛盾**（P1）として報告する。
+Contract で同一フィールドに `required: true` と `default` が両方指定されている場合、**論理矛盾**（major）として報告する。
 
 | required | default | 意味 | テスト生成 |
 |----------|---------|------|-----------|
 | `true` | なし | 必須フィールド。欠落はエラー | 欠落エラーテストを生成 |
-| `true` | あり | **矛盾**: 必須なのにデフォルトは不要 | P1 finding を生成。default 適用テストは**出さない** |
+| `true` | あり | **矛盾**: 必須なのにデフォルトは不要 | major finding を生成。default 適用テストは**出さない** |
 | `false` | あり | 任意フィールド。省略時は default 適用 | 省略→default 適用テストを生成 |
 | `false` | なし | 任意フィールド。省略時は null/未設定 | 省略 OK テストを生成 |
 
 **矛盾検出時のアクション**:
 1. テスト生成を続行する（ブロックしない）
 2. テストファイルの先頭に `// WARNING: Contract矛盾 - {field} は required:true かつ default あり` を出力
-3. Review Gate の Test Reviewer に P1 finding として報告
+3. Review Gate の Test Reviewer に major finding として報告
 
 #### `min: N` / `max: N`
 

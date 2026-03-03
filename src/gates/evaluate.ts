@@ -1,42 +1,42 @@
 import type { Finding, GateCounts } from "../types.js";
 
 export function countFindings(findings: Finding[]): GateCounts {
-  let p0 = 0;
-  let p1 = 0;
-  let p2 = 0;
+  let critical = 0;
+  let major = 0;
+  let minor = 0;
 
   for (const f of findings) {
     switch (f.severity) {
-      case "P0":
-        p0++;
+      case "critical":
+        critical++;
         break;
-      case "P1":
-        p1++;
+      case "major":
+        major++;
         break;
-      case "P2":
-        p2++;
+      case "minor":
+        minor++;
         break;
     }
   }
 
-  return { p0, p1, p2 };
+  return { critical, major, minor };
 }
 
 export interface GatePolicyOptions {
-  /** P1 の許容上限（デフォルト: 1） — CLAUDE.md 仕様: P0=0 かつ P1≤1 → PASS */
-  maxP1?: number;
+  /** major の許容上限（デフォルト: 1） — CLAUDE.md 仕様: critical=0 かつ major≤1 → PASS */
+  maxMajor?: number;
 }
 
 export function evaluateGatePolicy(
   counts: GateCounts,
   options?: GatePolicyOptions,
-): { passed: boolean; reason?: "p0_found" | "p1_exceeded" } {
-  const maxP1 = options?.maxP1 ?? 1;
-  if (counts.p0 > 0) {
-    return { passed: false, reason: "p0_found" };
+): { passed: boolean; reason?: "critical_found" | "major_exceeded" } {
+  const maxMajor = options?.maxMajor ?? 1;
+  if (counts.critical > 0) {
+    return { passed: false, reason: "critical_found" };
   }
-  if (counts.p1 > maxP1) {
-    return { passed: false, reason: "p1_exceeded" };
+  if (counts.major > maxMajor) {
+    return { passed: false, reason: "major_exceeded" };
   }
   return { passed: true };
 }

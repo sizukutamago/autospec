@@ -28,8 +28,10 @@ export async function runReviseLoop(
 
   for (let cycle = 1; cycle <= maxCycles; cycle++) {
     if (result.status === "passed") return result;
-    if (result.reason !== "p1_exceeded") return result;
+    // quorum_not_met（レビュアー不足）は REVISE で解決不可なので即時停止
+    if (result.reason === "quorum_not_met") return result;
 
+    // critical_found / major_exceeded いずれも REVISE で自動修正を試みる
     await onRevise(result.findings, cycle);
     result = await runReviewGate(gateOptions);
   }
