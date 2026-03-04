@@ -1,6 +1,6 @@
 import type { StageHandler, StageResult, QueryFn } from "../types.js";
 import { toErrorMessage } from "../utils/to-error-message.js";
-import { loadPromptFile } from "../config/prompt-loader.js";
+import { loadPromptFile, loadCustomPrompts } from "../config/prompt-loader.js";
 
 export interface SpecHandlerOptions {
   queryFn: QueryFn;
@@ -47,7 +47,7 @@ Generate YAML contracts in .autospec/contracts/ following the schema above.
 Organize contracts by type: api/, external/, files/, internal/.
 Also generate concepts/ and decisions/ as needed.
 
-REMINDER: You MUST write actual .contract.yaml files to disk. Do not just describe them in text.`;
+REMINDER: You MUST write actual .contract.yaml files to disk. Do not just describe them in text.${loadCustomPrompts("spec", projectRoot)}`;
 
     try {
       await options.queryFn(prompt);

@@ -82,13 +82,32 @@ export function createDefaultPipeline(
     return createNoopGateHandler();
   }
 
+  // サブエージェント用 queryFn ファクトリ（cwd がある場合のみ）
+  const subQueryFnFactory = cwd
+    ? (stageId: WorkStageId) => {
+        const ratio = config?.agents.parallel.sub_agent_turns_ratio ?? 0.5;
+        const subMaxTurns = Math.max(1, Math.floor(getMaxTurns(stageId) * ratio));
+        return (_agentIndex: number): QueryFn =>
+          (prompt: string) => claudeQuery(prompt, { cwd, maxTurns: subMaxTurns });
+      }
+    : undefined;
+
   engine.register("stage_1_spec", stages?.stage_1_spec ?? createSpecHandler({ queryFn: specQueryFn }));
   engine.register("contract_review_gate", gates?.contract_review_gate ?? defaultGate("contract"));
-  engine.register("stage_2_test", stages?.stage_2_test ?? createTestGenHandler({ queryFn: testQueryFn }));
+  engine.register("stage_2_test", stages?.stage_2_test ?? createTestGenHandler({
+    queryFn: testQueryFn,
+    subQueryFnFactory: subQueryFnFactory?.("stage_2_test"),
+  }));
   engine.register("test_review_gate", gates?.test_review_gate ?? defaultGate("test"));
-  engine.register("stage_3_implement", stages?.stage_3_implement ?? createImplementHandler({ queryFn: implQueryFn }));
+  engine.register("stage_3_implement", stages?.stage_3_implement ?? createImplementHandler({
+    queryFn: implQueryFn,
+    subQueryFnFactory: subQueryFnFactory?.("stage_3_implement"),
+  }));
   engine.register("code_review_gate", gates?.code_review_gate ?? defaultGate("code"));
-  engine.register("stage_4_docs", stages?.stage_4_docs ?? createDocsHandler({ queryFn: docsQueryFn }));
+  engine.register("stage_4_docs", stages?.stage_4_docs ?? createDocsHandler({
+    queryFn: docsQueryFn,
+    subQueryFnFactory: subQueryFnFactory?.("stage_4_docs"),
+  }));
   engine.register("doc_review_gate", gates?.doc_review_gate ?? defaultGate("doc"));
 
   return engine;

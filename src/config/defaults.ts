@@ -9,6 +9,12 @@ export const DEFAULT_CONFIG = {
   },
   agents: {
     interviewer: { min_questions: 1, max_questions: 5, max_turns: 10 },
+    parallel: {
+      test_agents: 0,
+      implement_agents: 0,
+      docs_agents: 2,
+      sub_agent_turns_ratio: 0.5,
+    },
   },
   gates: {
     type: "review" as const,

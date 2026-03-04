@@ -24,6 +24,12 @@ export const AutospecConfigSchema = z.object({
       max_questions: z.number().optional(),
       max_turns: z.number().optional(),
     }).optional(),
+    parallel: z.object({
+      test_agents: z.number().min(0).max(10).optional(),
+      implement_agents: z.number().min(0).max(10).optional(),
+      docs_agents: z.number().min(0).max(10).optional(),
+      sub_agent_turns_ratio: z.number().min(0.1).max(1.0).optional(),
+    }).optional(),
   }).optional(),
 
   gates: z.object({
@@ -60,6 +66,12 @@ export interface AutospecConfig {
   };
   agents: {
     interviewer: { min_questions: number; max_questions: number; max_turns: number };
+    parallel: {
+      test_agents: number;
+      implement_agents: number;
+      docs_agents: number;
+      sub_agent_turns_ratio: number;
+    };
   };
   gates: {
     type: "review" | "noop";

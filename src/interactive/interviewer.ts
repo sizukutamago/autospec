@@ -1,6 +1,3 @@
 // Re-export from new location for backward compatibility
-export {
-  generateFollowUpQuestion,
-  MAX_QUESTIONS,
-} from "../agents/interviewer.js";
-export type { QuestionResult } from "../agents/interviewer.js";
+export { generateFollowUpQuestion } from "../agents/interviewer.js";
+export type { QuestionResult, InterviewOptions } from "../agents/interviewer.js";

@@ -108,6 +108,15 @@ export interface PipelineScope {
   to?: StageName;
 }
 
+/** Gate失敗・ステージエラー共通の回復アクション */
+export type GateFailureAction = "retry" | "skip" | "abort";
+
+/** Blocked guard 時のユーザー選択 */
+export type BlockedGuardAction = "continue" | "abort";
+
+/** ステージエラー時のユーザー選択（GateFailureAction と同一） */
+export type StageErrorAction = GateFailureAction;
+
 export interface PipelineOptions {
   cwd: string;
   resume: boolean;
@@ -119,6 +128,22 @@ export interface PipelineOptions {
   startFromStage?: StageId;
   onStageStart?: (stageId: StageId) => void;
   onStageComplete?: (stageId: StageId, result: StageResult) => void;
+  /** Gate 失敗時に呼ばれる。未設定 → throw（既存動作） */
+  onGateFailed?: (
+    stageId: StageId,
+    reason: GateFailReason,
+    counts: GateCounts,
+  ) => Promise<GateFailureAction>;
+  /** Blocked guard 時に呼ばれる。未設定 → throw（既存動作） */
+  onBlockedGuard?: (
+    stageId: StageId,
+    blockedCount: number,
+  ) => Promise<BlockedGuardAction>;
+  /** ステージエラー時に呼ばれる。未設定 → throw（既存動作） */
+  onStageError?: (
+    stageId: StageId,
+    error: Error,
+  ) => Promise<StageErrorAction>;
 }
 
 export interface StageResult {

@@ -14,6 +14,8 @@ import type { PipelineOptions, PipelineScope, PipelineState, PipelineMode, Stage
 import type { ResumeInfo } from "./engine.js";
 import { toErrorMessage } from "./utils/to-error-message.js";
 import { initAutospec } from "./config/init.js";
+import { loadConfig } from "./config/index.js";
+import type { AutospecConfig } from "./config/index.js";
 
 const VERSION = "0.1.0";
 
@@ -43,9 +45,7 @@ export interface CliArgs {
   force: boolean;
   interactive: boolean;
   mode?: PipelineMode;
-  only?: StageName;
-  from?: StageName;
-  to?: StageName;
+  scope?: PipelineScope;
 }
 
 const VALID_STAGE_NAMES = new Set<string>(["spec", "test", "implement", "docs"]);
@@ -91,7 +91,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
       case "--only": {
         const v = argv[i + 1];
         if (v && VALID_STAGE_NAMES.has(v)) {
-          result.only = v as StageName;
+          result.scope = { only: v as StageName };
           i++;
         }
         break;
@@ -99,7 +99,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
       case "--from": {
         const v = argv[i + 1];
         if (v && VALID_STAGE_NAMES.has(v)) {
-          result.from = v as StageName;
+          result.scope = { ...result.scope, from: v as StageName };
           i++;
         }
         break;
@@ -107,7 +107,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
       case "--to": {
         const v = argv[i + 1];
         if (v && VALID_STAGE_NAMES.has(v)) {
-          result.to = v as StageName;
+          result.scope = { ...result.scope, to: v as StageName };
           i++;
         }
         break;
@@ -155,6 +155,7 @@ async function runInteractive(
   args: CliArgs,
   projectRoot: string,
   queryFn: QueryFn,
+  config: AutospecConfig,
 ): Promise<void> {
   p.intro(`autospec v${VERSION}`);
 
@@ -279,7 +280,7 @@ async function runInteractive(
         force: args.force,
         mode,
         startFromStage,
-        scope: buildScope(args),
+        scope: args.scope,
       });
       return;
     }
@@ -306,85 +307,91 @@ async function runInteractive(
   ];
 
   // Step 2: AI インタビューループ（エージェントが自律的にコード調査 + 質問）
+  const { agents: { interviewer: interviewerConfig } } = config;
   const interviewQueryFn: QueryFn = (prompt) =>
     claudeQuery(prompt, {
       cwd: projectRoot,
-      maxTurns: 10,
+      maxTurns: interviewerConfig.max_turns,
       tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
     });
 
+  const interviewOptions = {
+    maxQuestions: interviewerConfig.max_questions,
+    minQuestions: interviewerConfig.min_questions,
+  };
+
   let questionCount = 0;
+  let readyForPipeline = false;
 
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const thinkSpinner = p.spinner();
-    thinkSpinner.start("プロジェクトを調査中...");
+  while (!readyForPipeline) {
+    // Interview loop
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const thinkSpinner = p.spinner();
+      thinkSpinner.start("プロジェクトを調査中...");
 
-    let result;
-    try {
-      result = await generateFollowUpQuestion(history, interviewQueryFn, questionCount);
-    } catch {
-      thinkSpinner.stop("質問生成をスキップ");
-      break;
-    }
+      let result;
+      try {
+        result = await generateFollowUpQuestion(history, interviewQueryFn, questionCount, interviewOptions);
+      } catch {
+        thinkSpinner.stop("質問生成をスキップ");
+        break;
+      }
 
-    if (result.type === "ready") {
-      thinkSpinner.stop("ヒアリング完了");
-      break;
-    }
+      if (result.type === "ready" || result.type === "limit_reached") {
+        thinkSpinner.stop("ヒアリング完了");
+        break;
+      }
 
-    if (result.type === "limit_reached") {
-      thinkSpinner.stop("ヒアリング完了");
+      // type === "question"
+      thinkSpinner.stop("");
+      questionCount++;
 
-      const wantMore = await p.confirm({
-        message: "もう少し詳しく聞きたいですか？",
-        active: "はい、続ける",
-        inactive: "いいえ、開始する",
-        initialValue: false,
+      history.push({ role: "assistant", content: result.text });
+
+      const answer = await p.text({
+        message: result.text,
+        placeholder: "回答を入力",
       });
 
-      if (p.isCancel(wantMore)) {
+      if (p.isCancel(answer)) {
         p.cancel("キャンセルしました");
         process.exit(0);
       }
 
-      if (wantMore) {
-        questionCount = 0;
-        continue;
-      }
-      break;
+      history.push({ role: "user", content: answer.trim() });
     }
 
-    // type === "question"
-    thinkSpinner.stop("");
-    questionCount++;
-
-    history.push({ role: "assistant", content: result.text });
-
-    const answer = await p.text({
-      message: result.text,
-      placeholder: "回答を入力",
+    // Step 3: 開始 or 追加チャット
+    const postChoice = await p.select({
+      message: "パイプラインを開始しますか？",
+      options: [
+        { value: "start" as const, label: "開始する" },
+        { value: "add" as const, label: "追加で伝えたいことがある" },
+      ],
     });
 
-    if (p.isCancel(answer)) {
+    if (p.isCancel(postChoice)) {
       p.cancel("キャンセルしました");
       process.exit(0);
     }
 
-    history.push({ role: "user", content: answer.trim() });
-  }
+    if (postChoice === "start") {
+      readyForPipeline = true;
+    } else {
+      const additional = await p.text({
+        message: "追加の情報を入力してください",
+        placeholder: "追加の要件や補足事項",
+      });
 
-  // Step 3: 確認
-  const shouldStart = await p.confirm({
-    message: "パイプラインを開始しますか？",
-    active: "開始する",
-    inactive: "キャンセル",
-    initialValue: true,
-  });
+      if (p.isCancel(additional)) {
+        p.cancel("キャンセルしました");
+        process.exit(0);
+      }
 
-  if (p.isCancel(shouldStart) || !shouldStart) {
-    p.cancel("キャンセルしました");
-    process.exit(0);
+      history.push({ role: "user", content: additional.trim() });
+      questionCount = 0;
+    }
   }
 
   // Step 4: 要約生成（コードを参照しながら正確な要約を生成）
@@ -394,7 +401,7 @@ async function runInteractive(
   const summaryQueryFn: QueryFn = (prompt) =>
     claudeQuery(prompt, {
       cwd: projectRoot,
-      maxTurns: 10,
+      maxTurns: 3,
       tools: ["Read", "Glob", "Grep"],
     });
 
@@ -419,14 +426,8 @@ async function runInteractive(
     force: args.force,
     mode,
     taskDescription,
-    scope: buildScope(args),
+    scope: args.scope,
   });
-}
-
-function buildScope(args: CliArgs): PipelineScope | undefined {
-  if (args.only) return { only: args.only };
-  if (args.from || args.to) return { from: args.from, to: args.to };
-  return undefined;
 }
 
 interface RunPipelineArgs {
@@ -456,6 +457,51 @@ async function runPipeline(args: RunPipelineArgs): Promise<void> {
     startFromStage,
     onStageStart: (stageId) => stageSpinner.start(`${STAGE_LABELS[stageId]}...`),
     onStageComplete: (stageId, result) => stageSpinner.stop(`${STAGE_LABELS[stageId]} → ${statusLabel(result.status)}`),
+    onGateFailed: async (stageId, reason, counts) => {
+      stageSpinner.stop(`${STAGE_LABELS[stageId]} → 失敗`);
+      p.log.warn(`${STAGE_LABELS[stageId]} 失敗: ${reason}`);
+      p.log.info(`  critical: ${counts.critical}, major: ${counts.major}, minor: ${counts.minor}`);
+
+      const action = await p.select({
+        message: "どうしますか？",
+        options: [
+          { value: "retry" as const, label: "カウントをリセットして再実行" },
+          { value: "skip" as const, label: "ゲートをスキップして続行" },
+          { value: "abort" as const, label: "パイプラインを中断" },
+        ],
+      });
+      if (p.isCancel(action)) return "abort";
+      return action;
+    },
+    onBlockedGuard: async (_, blockedCount) => {
+      stageSpinner.stop();
+      p.log.warn(`Stage 3 で ${blockedCount} 件のコントラクトがブロックされています`);
+
+      const action = await p.select({
+        message: "どうしますか？",
+        options: [
+          { value: "continue" as const, label: "ブロックを無視して Stage 4 を続行" },
+          { value: "abort" as const, label: "パイプラインを中断" },
+        ],
+      });
+      if (p.isCancel(action)) return "abort";
+      return action;
+    },
+    onStageError: async (stageId, error) => {
+      stageSpinner.stop(`${STAGE_LABELS[stageId]} → エラー`);
+      p.log.error(`${STAGE_LABELS[stageId]} でエラー: ${error.message}`);
+
+      const action = await p.select({
+        message: "どうしますか？",
+        options: [
+          { value: "retry" as const, label: "ステージを再実行" },
+          { value: "skip" as const, label: "ステージをスキップして続行" },
+          { value: "abort" as const, label: "パイプラインを中断" },
+        ],
+      });
+      if (p.isCancel(action)) return "abort";
+      return action;
+    },
   };
 
   try {
@@ -482,6 +528,7 @@ async function runNonInteractive(
   args: CliArgs,
   projectRoot: string,
   queryFn: QueryFn,
+  config: AutospecConfig,
 ): Promise<void> {
   const state = args.resume
     ? loadState(projectRoot)
@@ -506,8 +553,8 @@ async function runNonInteractive(
     cwd: projectRoot,
     resume: args.resume,
     force: args.force,
-    mode: args.mode ?? "full",
-    scope: buildScope(args),
+    mode: args.mode ?? config.pipeline.mode,
+    scope: args.scope,
     onStageStart: (stageId) => console.log(`[autospec] ${STAGE_LABELS[stageId]}...`),
     onStageComplete: (stageId, result) => console.log(`[autospec] ${STAGE_LABELS[stageId]} → ${result.status}`),
   };
@@ -544,12 +591,13 @@ async function main(): Promise<void> {
     initAutospec(projectRoot);
   }
 
+  const config = loadConfig(projectRoot);
   const queryFn: QueryFn = (prompt) => claudeQuery(prompt, { cwd: projectRoot });
 
   if (args.interactive) {
-    await runInteractive(args, projectRoot, queryFn);
+    await runInteractive(args, projectRoot, queryFn, config);
   } else {
-    await runNonInteractive(args, projectRoot, queryFn);
+    await runNonInteractive(args, projectRoot, queryFn, config);
   }
 }
 

@@ -21,8 +21,11 @@ export { FindingSchema, ReviewOutputSchema, parseReviewOutput } from "./gates/sc
 // Stage handlers
 export { createSpecHandler } from "./stages/spec.js";
 export { createTestGenHandler } from "./stages/test-gen.js";
+export type { TestGenHandlerOptions } from "./stages/test-gen.js";
 export { createImplementHandler } from "./stages/implement.js";
+export type { ImplementHandlerOptions } from "./stages/implement.js";
 export { createDocsHandler } from "./stages/docs.js";
+export type { DocsHandlerOptions } from "./stages/docs.js";
 
 // Presets (one-call pipeline setup)
 export { createDefaultPipeline } from "./presets.js";
@@ -65,20 +68,30 @@ export type {
   GateFailReason,
   GateResult,
   QueryFn,
+  GateFailureAction,
+  BlockedGuardAction,
+  StageErrorAction,
 } from "./types.js";
 
 // Agents
 export { runParallel } from "./agents/parallel-runner.js";
 export type { ParallelTask, ParallelResult } from "./agents/parallel-runner.js";
 export { generateFollowUpQuestion } from "./agents/interviewer.js";
-export type { QuestionResult } from "./agents/interviewer.js";
+export type { QuestionResult, InterviewOptions } from "./agents/interviewer.js";
 
 // Config
 export { loadConfig } from "./config/loader.js";
 export { DEFAULT_CONFIG, } from "./config/defaults.js";
 export { AutospecConfigSchema } from "./config/schema.js";
 export type { AutospecConfig } from "./config/schema.js";
-export { loadPromptFile, getPromptsDir } from "./config/prompt-loader.js";
+export { loadPromptFile, getPromptsDir, loadCustomPrompts, loadCustomPromptFiles } from "./config/prompt-loader.js";
+export type { CustomPromptFile } from "./config/prompt-loader.js";
+
+// Contracts
+export { discoverContracts } from "./contracts/discovery.js";
+export type { ContractMeta } from "./contracts/discovery.js";
+export { topoSort, splitIntoChunks, CyclicDependencyError } from "./contracts/topo-sort.js";
+export type { TopoGroup } from "./contracts/topo-sort.js";
 
 // Review Gate Handler
 export { createReviewGateHandler } from "./gates/review-gate-handler.js";

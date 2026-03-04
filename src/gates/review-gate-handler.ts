@@ -1,5 +1,5 @@
 import type { StageHandler, StageResult, Finding } from "../types.js";
-import { loadPromptFile } from "../config/prompt-loader.js";
+import { loadPromptFile, loadCustomPrompts, loadCustomPromptFiles } from "../config/prompt-loader.js";
 import { claudeQuery, type ClaudeQueryOptions } from "../query.js";
 import { type ReviewerFn } from "./review-gate.js";
 import { runReviseLoop } from "./revise.js";
@@ -49,6 +49,13 @@ IMPORTANT: ID naming format (e.g. "int-001" vs "CON-xxx") is ALWAYS minor, never
 - minor: Typos, formatting issues, style inconsistencies`,
 };
 
+const GATE_TO_CUSTOM_TARGET: Record<GateKind, string> = {
+  contract: "contract_review",
+  test: "test_review",
+  code: "code_review",
+  doc: "doc_review",
+};
+
 const REVISE_TARGETS: Record<GateKind, string> = {
   contract: "Focus on the contract YAML files in .autospec/contracts/",
   test: "Focus on the test files in the tests/ directory",
@@ -95,7 +102,10 @@ function createReviewer(
   agentIndex: number,
   projectRoot: string,
   queryFn: (prompt: string, options?: ClaudeQueryOptions) => Promise<string>,
+  reviewerName?: string,
 ): ReviewerFn {
+  const displayName = reviewerName ?? `reviewer-${agentIndex + 1}`;
+
   return async () => {
     const severityRules = SEVERITY_RULES[gate];
 
@@ -103,7 +113,7 @@ function createReviewer(
     const reviewText = await queryFn(
       `${reviewPrompt}
 
-You are reviewer agent #${agentIndex + 1} for the "${gate}" review gate.
+You are reviewer agent "${displayName}" for the "${gate}" review gate.
 Review the project at: ${projectRoot}
 
 Read the relevant files using Read/Glob/Grep tools, then provide your detailed review.
@@ -122,7 +132,7 @@ If there are no issues, explicitly state that no issues were found.`,
     const jsonResponse = await queryFn(
       `${JSON_CONVERSION_PROMPT}
 
-reviewer: "reviewer-${agentIndex + 1}"
+reviewer: "${displayName}"
 gate: "${gate}"
 
 Review text to convert:
@@ -205,7 +215,7 @@ Instructions:
 - ${reviseTarget}
 - Do NOT create new files unless absolutely necessary
 - Make minimal, targeted changes
-- Be efficient: batch multiple edits to the same file together`,
+- Be efficient: batch multiple edits to the same file together${loadCustomPrompts("revise", projectRoot)}`,
       {
         cwd: projectRoot,
         maxTurns: reviseTurns,
@@ -230,6 +240,14 @@ export function createReviewGateHandler(
     const reviewers: ReviewerFn[] = Array.from({ length: count }, (_, i) =>
       createReviewer(gate, reviewPrompt, i, projectRoot, queryFn),
     );
+
+    // カスタムレビュアーを追加（各 .md ファイルが独立したレビュアーになる）
+    const customFiles = loadCustomPromptFiles(GATE_TO_CUSTOM_TARGET[gate], projectRoot);
+    for (const [i, file] of customFiles.entries()) {
+      reviewers.push(
+        createReviewer(gate, file.content, count + i, projectRoot, queryFn, file.name),
+      );
+    }
 
     try {
       const result = await runReviseLoop({

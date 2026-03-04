@@ -65,12 +65,25 @@ export class PipelineEngine {
       if (stageId === "stage_4_docs") {
         const implStage = state.stages.stage_3_implement;
         if (implStage.blocked.length > 0) {
-          state.final_status = "aborted";
-          saveState(state);
-          throw new PipelineError(
-            `Cannot proceed to Stage 4: ${implStage.blocked.length} contract(s) still blocked`,
-            stageId,
-          );
+          if (options.onBlockedGuard) {
+            const action = await options.onBlockedGuard(stageId, implStage.blocked.length);
+            if (action === "abort") {
+              state.final_status = "aborted";
+              saveState(state);
+              throw new PipelineError(
+                `Cannot proceed to Stage 4: ${implStage.blocked.length} contract(s) still blocked`,
+                stageId,
+              );
+            }
+            // "continue" → blocked のまま Stage 4 を実行
+          } else {
+            state.final_status = "aborted";
+            saveState(state);
+            throw new PipelineError(
+              `Cannot proceed to Stage 4: ${implStage.blocked.length} contract(s) still blocked`,
+              stageId,
+            );
+          }
         }
       }
 
@@ -87,32 +100,102 @@ export class PipelineEngine {
       try {
         result = await handler(state, options);
       } catch (err) {
-        // PipelineError 系はステージを failed + aborted にして re-throw
-        if (err instanceof PipelineError) {
+        const error = err instanceof Error ? err : new Error(toErrorMessage(err));
+
+        if (options.onStageError) {
+          const action = await options.onStageError(stageId, error);
+          if (action === "retry") {
+            // 同じステージを再実行するためインデックスを戻す
+            this.markInProgress(state, stageId);
+            saveState(state);
+            try {
+              result = await handler(state, options);
+            } catch (retryErr) {
+              this.markFailed(state, stageId);
+              state.final_status = "aborted";
+              saveState(state);
+              throw new PipelineError(
+                `Stage "${stageId}" failed on retry: ${toErrorMessage(retryErr)}`,
+                stageId,
+              );
+            }
+          } else if (action === "skip") {
+            state.stages[stageId].status = "skipped" as never;
+            saveState(state);
+            continue;
+          } else {
+            // "abort"
+            this.markFailed(state, stageId);
+            state.final_status = "aborted";
+            saveState(state);
+            if (err instanceof PipelineError) throw err;
+            throw new PipelineError(
+              `Stage "${stageId}" failed unexpectedly: ${toErrorMessage(err)}`,
+              stageId,
+            );
+          }
+        } else {
+          // コールバック未設定 → 既存動作
+          if (err instanceof PipelineError) {
+            this.markFailed(state, stageId);
+            state.final_status = "aborted";
+            saveState(state);
+            throw err;
+          }
           this.markFailed(state, stageId);
           state.final_status = "aborted";
           saveState(state);
-          throw err;
+          throw new PipelineError(
+            `Stage "${stageId}" failed unexpectedly: ${toErrorMessage(err)}`,
+            stageId,
+          );
         }
-        // 予期しないエラー: ステージを failed + aborted にして PipelineError でラップ
-        this.markFailed(state, stageId);
-        state.final_status = "aborted";
-        saveState(state);
-        throw new PipelineError(
-          `Stage "${stageId}" failed unexpectedly: ${toErrorMessage(err)}`,
-          stageId,
-        );
       }
 
       this.applyResult(state, stageId, result);
       options.onStageComplete?.(stageId, result);
 
-      // Gate失敗時は即座に停止
+      // Gate失敗時の回復ロジック
       if (this.isGate(stageId) && result.status === "failed") {
-        state.final_status = "aborted";
-        saveState(state);
         const reason = this.toGateFailReason(result.reason);
-        throw new GateFailedError(stageId, reason);
+        const gate = state.stages[stageId] as GateState;
+
+        if (options.onGateFailed) {
+          const action = await options.onGateFailed(stageId, reason, gate.final_counts);
+
+          if (action === "retry") {
+            // カウントをリセットして再実行
+            gate.final_counts = { critical: 0, major: 0, minor: 0 };
+            gate.findings = [];
+            // markInProgress が status = "pending" を設定するので先行セット不要
+            options.onStageStart?.(stageId);
+            this.markInProgress(state, stageId);
+            saveState(state);
+            const retryResult = await handler(state, options);
+            this.applyResult(state, stageId, retryResult);
+            options.onStageComplete?.(stageId, retryResult);
+
+            // 再実行後もまだ失敗の場合は throw
+            if (retryResult.status === "failed") {
+              state.final_status = "aborted";
+              saveState(state);
+              throw new GateFailedError(stageId, this.toGateFailReason(retryResult.reason));
+            }
+          } else if (action === "skip") {
+            gate.status = "passed";
+            saveState(state);
+          } else {
+            // "abort"
+            state.final_status = "aborted";
+            saveState(state);
+            throw new GateFailedError(stageId, reason);
+          }
+        } else {
+          // コールバック未設定 → 既存動作
+          state.final_status = "aborted";
+          saveState(state);
+          throw new GateFailedError(stageId, reason);
+        }
       }
 
       saveState(state);

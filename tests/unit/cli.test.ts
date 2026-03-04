@@ -51,65 +51,62 @@ describe("parseCliArgs", () => {
   });
 
   // -----------------------------------------------------------------------
-  // --only / --from / --to flags
+  // --only / --from / --to → scope
   // -----------------------------------------------------------------------
   describe("scope flags", () => {
     it("parses --only spec", () => {
       const result = parseCliArgs(["--only", "spec"]);
-      expect(result.only).toBe("spec");
+      expect(result.scope).toEqual({ only: "spec" });
     });
 
     it("parses --only docs", () => {
       const result = parseCliArgs(["--only", "docs"]);
-      expect(result.only).toBe("docs");
+      expect(result.scope).toEqual({ only: "docs" });
     });
 
     it("parses --only implement", () => {
       const result = parseCliArgs(["--only", "implement"]);
-      expect(result.only).toBe("implement");
+      expect(result.scope).toEqual({ only: "implement" });
     });
 
     it("parses --only test", () => {
       const result = parseCliArgs(["--only", "test"]);
-      expect(result.only).toBe("test");
+      expect(result.scope).toEqual({ only: "test" });
     });
 
     it("ignores invalid --only value", () => {
       const result = parseCliArgs(["--only", "invalid"]);
-      expect(result.only).toBeUndefined();
+      expect(result.scope).toBeUndefined();
     });
 
     it("parses --from test", () => {
       const result = parseCliArgs(["--from", "test"]);
-      expect(result.from).toBe("test");
+      expect(result.scope).toEqual({ from: "test" });
     });
 
     it("parses --to implement", () => {
       const result = parseCliArgs(["--to", "implement"]);
-      expect(result.to).toBe("implement");
+      expect(result.scope).toEqual({ to: "implement" });
     });
 
     it("parses --from test --to implement", () => {
       const result = parseCliArgs(["--from", "test", "--to", "implement"]);
-      expect(result.from).toBe("test");
-      expect(result.to).toBe("implement");
+      expect(result.scope).toEqual({ from: "test", to: "implement" });
     });
 
     it("parses --from without --to", () => {
       const result = parseCliArgs(["--from", "implement"]);
-      expect(result.from).toBe("implement");
-      expect(result.to).toBeUndefined();
+      expect(result.scope).toEqual({ from: "implement" });
     });
 
     it("parses --to without --from", () => {
       const result = parseCliArgs(["--to", "test"]);
-      expect(result.to).toBe("test");
-      expect(result.from).toBeUndefined();
+      expect(result.scope).toEqual({ to: "test" });
     });
 
     it("combines scope flags with other flags", () => {
       const result = parseCliArgs(["--only", "docs", "--no-interactive", "--force"]);
-      expect(result.only).toBe("docs");
+      expect(result.scope).toEqual({ only: "docs" });
       expect(result.interactive).toBe(false);
       expect(result.force).toBe(true);
     });

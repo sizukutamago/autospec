@@ -1017,4 +1017,258 @@ describe("PipelineEngine", () => {
       expect(callOrder).toEqual([]);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Recovery callbacks
+  // -------------------------------------------------------------------------
+  describe("recovery callbacks", () => {
+    // --- Gate failure recovery ---
+    describe("onGateFailed", () => {
+      it("throws GateFailedError when onGateFailed is not set (backward compat)", async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          contract_review_gate: vi.fn(async () => {
+            callOrder.push("contract_review_gate");
+            return { status: "failed" as const, reason: "critical_found", counts: { critical: 1, major: 0, minor: 0 }, findings: [] };
+          }),
+        });
+
+        await expect(engine.run(state, DEFAULT_OPTIONS)).rejects.toThrow(GateFailedError);
+      });
+
+      it('retries gate when onGateFailed returns "retry"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        let gateCallCount = 0;
+        registerAllHandlers(engine, callOrder, {
+          contract_review_gate: vi.fn(async () => {
+            callOrder.push("contract_review_gate");
+            gateCallCount++;
+            if (gateCallCount === 1) {
+              return { status: "failed" as const, reason: "major_exceeded", counts: { critical: 0, major: 3, minor: 0 }, findings: [] };
+            }
+            return { status: "passed" as const, counts: { critical: 0, major: 0, minor: 0 }, findings: [] };
+          }),
+        });
+
+        const onGateFailed = vi.fn().mockResolvedValue("retry");
+
+        await engine.run(state, { ...DEFAULT_OPTIONS, onGateFailed });
+
+        expect(onGateFailed).toHaveBeenCalledOnce();
+        expect(gateCallCount).toBe(2);
+        expect(state.final_status).toBe("completed");
+      });
+
+      it('skips gate when onGateFailed returns "skip"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          contract_review_gate: vi.fn(async () => {
+            callOrder.push("contract_review_gate");
+            return { status: "failed" as const, reason: "major_exceeded", counts: { critical: 0, major: 3, minor: 0 }, findings: [] };
+          }),
+        });
+
+        const onGateFailed = vi.fn().mockResolvedValue("skip");
+
+        await engine.run(state, { ...DEFAULT_OPTIONS, onGateFailed });
+
+        expect(onGateFailed).toHaveBeenCalledOnce();
+        expect(state.stages.contract_review_gate.status).toBe("passed");
+        expect(state.final_status).toBe("completed");
+      });
+
+      it('throws GateFailedError when onGateFailed returns "abort"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          contract_review_gate: vi.fn(async () => {
+            callOrder.push("contract_review_gate");
+            return { status: "failed" as const, reason: "critical_found", counts: { critical: 1, major: 0, minor: 0 }, findings: [] };
+          }),
+        });
+
+        const onGateFailed = vi.fn().mockResolvedValue("abort");
+
+        await expect(engine.run(state, { ...DEFAULT_OPTIONS, onGateFailed })).rejects.toThrow(GateFailedError);
+      });
+
+      it("resets gate counts on retry and completes when second attempt passes", async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        let gateCallCount = 0;
+        registerAllHandlers(engine, callOrder, {
+          code_review_gate: vi.fn(async () => {
+            callOrder.push("code_review_gate");
+            gateCallCount++;
+            if (gateCallCount === 1) {
+              return { status: "failed" as const, reason: "major_exceeded", counts: { critical: 0, major: 5, minor: 2 }, findings: [{ severity: "major" as const, target: "foo", field: "bar", message: "issue" }] };
+            }
+            return { status: "passed" as const, counts: { critical: 0, major: 0, minor: 0 }, findings: [] };
+          }),
+        });
+
+        const onGateFailed = vi.fn().mockResolvedValue("retry");
+
+        await engine.run(state, { ...DEFAULT_OPTIONS, onGateFailed });
+
+        expect(state.stages.code_review_gate.status).toBe("passed");
+        expect(state.stages.code_review_gate.final_counts).toEqual({ critical: 0, major: 0, minor: 0 });
+        expect(state.final_status).toBe("completed");
+      });
+    });
+
+    // --- Blocked guard recovery ---
+    describe("onBlockedGuard", () => {
+      it("throws PipelineError when onBlockedGuard is not set (backward compat)", async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        state.stages.stage_3_implement.blocked = [
+          { contract_id: "c1", reason: "failed", detail: "error" },
+        ];
+
+        registerAllHandlers(engine, callOrder);
+
+        await expect(engine.run(state, {
+          ...DEFAULT_OPTIONS,
+          scope: { only: "docs" },
+        })).rejects.toThrow(PipelineError);
+      });
+
+      it('continues to stage 4 when onBlockedGuard returns "continue"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        state.stages.stage_3_implement.blocked = [
+          { contract_id: "c1", reason: "failed", detail: "error" },
+        ];
+
+        registerAllHandlers(engine, callOrder);
+
+        const onBlockedGuard = vi.fn().mockResolvedValue("continue");
+
+        await engine.run(state, {
+          ...DEFAULT_OPTIONS,
+          scope: { only: "docs" },
+          onBlockedGuard,
+        });
+
+        expect(onBlockedGuard).toHaveBeenCalledWith("stage_4_docs", 1);
+        expect(callOrder).toContain("stage_4_docs");
+        expect(state.final_status).toBe("completed");
+      });
+
+      it('throws PipelineError when onBlockedGuard returns "abort"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        state.stages.stage_3_implement.blocked = [
+          { contract_id: "c1", reason: "failed", detail: "error" },
+        ];
+
+        registerAllHandlers(engine, callOrder);
+
+        const onBlockedGuard = vi.fn().mockResolvedValue("abort");
+
+        await expect(engine.run(state, {
+          ...DEFAULT_OPTIONS,
+          scope: { only: "docs" },
+          onBlockedGuard,
+        })).rejects.toThrow(PipelineError);
+      });
+    });
+
+    // --- Stage error recovery ---
+    describe("onStageError", () => {
+      it("throws PipelineError when onStageError is not set (backward compat)", async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          stage_1_spec: vi.fn(async () => {
+            throw new Error("API connection failed");
+          }),
+        });
+
+        await expect(engine.run(state, DEFAULT_OPTIONS)).rejects.toThrow(PipelineError);
+      });
+
+      it('retries stage when onStageError returns "retry"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        let specCallCount = 0;
+        registerAllHandlers(engine, callOrder, {
+          stage_1_spec: vi.fn(async () => {
+            specCallCount++;
+            if (specCallCount === 1) throw new Error("transient failure");
+            callOrder.push("stage_1_spec");
+            return { status: "completed" as const };
+          }),
+        });
+
+        const onStageError = vi.fn().mockResolvedValue("retry");
+
+        await engine.run(state, { ...DEFAULT_OPTIONS, onStageError });
+
+        expect(onStageError).toHaveBeenCalledOnce();
+        expect(specCallCount).toBe(2);
+        expect(state.final_status).toBe("completed");
+      });
+
+      it('skips stage when onStageError returns "skip"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          stage_1_spec: vi.fn(async () => {
+            throw new Error("unrecoverable");
+          }),
+        });
+
+        const onStageError = vi.fn().mockResolvedValue("skip");
+
+        await engine.run(state, { ...DEFAULT_OPTIONS, onStageError });
+
+        expect(onStageError).toHaveBeenCalledOnce();
+        expect(state.stages.stage_1_spec.status).toBe("skipped");
+        expect(state.final_status).toBe("completed");
+      });
+
+      it('throws PipelineError when onStageError returns "abort"', async () => {
+        const engine = new PipelineEngine();
+        const state = createInitialState("/tmp/test");
+        const callOrder: StageId[] = [];
+
+        registerAllHandlers(engine, callOrder, {
+          stage_1_spec: vi.fn(async () => {
+            throw new Error("fatal");
+          }),
+        });
+
+        const onStageError = vi.fn().mockResolvedValue("abort");
+
+        await expect(engine.run(state, { ...DEFAULT_OPTIONS, onStageError })).rejects.toThrow(PipelineError);
+      });
+    });
+  });
 });

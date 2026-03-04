@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { createReviewGateHandler } from "../../src/gates/review-gate-handler.js";
 import { createInitialState } from "../../src/state.js";
 import type { PipelineOptions } from "../../src/types.js";
@@ -97,5 +100,166 @@ describe("createReviewGateHandler", () => {
     const state = createInitialState("/tmp/test");
     const result = await handler(state, DEFAULT_OPTIONS);
     expect(result.status).toBe("failed");
+  });
+
+  // -------------------------------------------------------------------
+  // Custom prompt injection tests
+  // -------------------------------------------------------------------
+
+  describe("custom prompt injection", () => {
+    let tmpDir: string;
+
+    function mkdirp(dir: string): void {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    afterEach(() => {
+      if (tmpDir) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+      mockClaudeQuery.mockReset();
+    });
+
+    it("adds custom reviewers from .autospec/prompts/{gate}_review/ files", async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-gate-custom-"));
+
+      // カスタムレビュアー用プロンプトファイルを配置
+      const promptDir = path.join(tmpDir, ".autospec", "prompts", "contract_review");
+      mkdirp(promptDir);
+      fs.writeFileSync(path.join(promptDir, "security-focus.md"), "CUSTOM_SECURITY_REVIEWER");
+
+      // プロンプト内容ベースで Phase を判定（並行実行に対応）
+      const capturedPrompts: string[] = [];
+      const passJson = {
+        reviewer: "reviewer-1",
+        gate: "contract",
+        findings: [],
+        summary: { critical: 0, major: 0, minor: 0 },
+      };
+      mockClaudeQuery.mockImplementation((prompt: string) => {
+        capturedPrompts.push(prompt);
+        if (prompt.includes("You are a data converter")) {
+          // Phase 2: JSON 変換
+          return Promise.resolve("```json\n" + JSON.stringify(passJson) + "\n```");
+        }
+        // Phase 1: レビューテキスト
+        return Promise.resolve("No issues found.");
+      });
+
+      const handler = createReviewGateHandler({
+        gate: "contract",
+        reviewerCount: 1,  // デフォルト1人 + カスタム1人 = 計2人
+        projectRoot: tmpDir,
+      });
+
+      const state = createInitialState(tmpDir);
+      await handler(state, DEFAULT_OPTIONS);
+
+      // 2レビュアー × 2フェーズ = 4回呼ばれるはず
+      expect(capturedPrompts.length).toBe(4);
+
+      // カスタムレビュアーのプロンプト（Phase 1）にカスタム内容が含まれる
+      const hasCustom = capturedPrompts.some((p) => p.includes("CUSTOM_SECURITY_REVIEWER"));
+      expect(hasCustom).toBe(true);
+    });
+
+    it("custom reviewer uses file name as reviewer identifier", async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-gate-name-"));
+
+      const promptDir = path.join(tmpDir, ".autospec", "prompts", "contract_review");
+      mkdirp(promptDir);
+      fs.writeFileSync(path.join(promptDir, "my-checker.md"), "Custom instructions");
+
+      // プロンプト内容ベースで Phase を判定（並行実行に対応）
+      const capturedPrompts: string[] = [];
+      const passJson = {
+        reviewer: "reviewer-1",
+        gate: "contract",
+        findings: [],
+        summary: { critical: 0, major: 0, minor: 0 },
+      };
+      mockClaudeQuery.mockImplementation((prompt: string) => {
+        capturedPrompts.push(prompt);
+        if (prompt.includes("You are a data converter")) {
+          return Promise.resolve("```json\n" + JSON.stringify(passJson) + "\n```");
+        }
+        return Promise.resolve("No issues found.");
+      });
+
+      const handler = createReviewGateHandler({
+        gate: "contract",
+        reviewerCount: 1,
+        projectRoot: tmpDir,
+      });
+
+      const state = createInitialState(tmpDir);
+      await handler(state, DEFAULT_OPTIONS);
+
+      // カスタムレビュアーのプロンプトにファイル名ベースの識別子が含まれる
+      const customPhase1 = capturedPrompts.find((p) => p.includes("Custom instructions"));
+      expect(customPhase1).toBeDefined();
+      expect(customPhase1).toContain("my-checker");
+    });
+
+    it("includes custom prompts in revise agent prompt", async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-gate-revise-"));
+
+      // Revise 用カスタムプロンプト（加算的注入）
+      const reviseDir = path.join(tmpDir, ".autospec", "prompts", "revise");
+      mkdirp(reviseDir);
+      fs.writeFileSync(path.join(reviseDir, "fix-rules.md"), "CUSTOM_REVISE_MARKER");
+
+      const criticalJson = {
+        reviewer: "reviewer-1",
+        gate: "contract",
+        findings: [{
+          severity: "critical",
+          target: "CON-test",
+          field: "input",
+          message: "missing required field",
+        }],
+        summary: { critical: 1, major: 0, minor: 0 },
+      };
+      const passJson = {
+        reviewer: "reviewer-1",
+        gate: "contract",
+        findings: [],
+        summary: { critical: 0, major: 0, minor: 0 },
+      };
+
+      const capturedPrompts: string[] = [];
+      let callCount = 0;
+      mockClaudeQuery.mockImplementation((prompt: string) => {
+        capturedPrompts.push(prompt);
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve("Found critical issues.");
+        }
+        if (callCount === 2) {
+          return Promise.resolve("```json\n" + JSON.stringify(criticalJson) + "\n```");
+        }
+        if (callCount === 3) {
+          return Promise.resolve("Fixed all issues.");
+        }
+        if (callCount === 4) {
+          return Promise.resolve("No issues found after revision.");
+        }
+        return Promise.resolve("```json\n" + JSON.stringify(passJson) + "\n```");
+      });
+
+      const handler = createReviewGateHandler({
+        gate: "contract",
+        reviewerCount: 1,
+        projectRoot: tmpDir,
+      });
+
+      const state = createInitialState(tmpDir);
+      await handler(state, DEFAULT_OPTIONS);
+
+      // Revise プロンプト（3番目の呼び出し）にカスタム内容が含まれる
+      expect(capturedPrompts.length).toBeGreaterThanOrEqual(3);
+      const revisePrompt = capturedPrompts[2];
+      expect(revisePrompt).toContain("CUSTOM_REVISE_MARKER");
+    });
   });
 });

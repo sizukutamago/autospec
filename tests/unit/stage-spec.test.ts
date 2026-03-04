@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSpecHandler } from "../../src/stages/spec.js";
 import type { PipelineOptions, PipelineState } from "../../src/types.js";
 
@@ -113,5 +116,56 @@ describe("createSpecHandler", () => {
     expect(result.status).toBe("failed");
     expect(result.reason).toBeDefined();
     expect(result.reason).toContain(errorMessage);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Custom prompt injection
+  // ---------------------------------------------------------------------------
+  describe("custom prompt injection", () => {
+    let tmpDir: string;
+
+    afterEach(() => {
+      if (tmpDir) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("includes custom prompts when .autospec/prompts/spec/ has files", async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "spec-custom-"));
+      const marker = "SPEC_CUSTOM_MARKER_12345";
+      const promptDir = path.join(tmpDir, ".autospec", "prompts", "spec");
+      fs.mkdirSync(promptDir, { recursive: true });
+      fs.writeFileSync(path.join(promptDir, "custom.md"), marker);
+
+      const queryFn = vi.fn().mockResolvedValue("generated contracts");
+      const handler = createSpecHandler({ queryFn });
+      const state = makeState();
+      state.project_root = tmpDir;
+      const options = makeOptions();
+
+      await handler(state, options);
+
+      const prompt = String(queryFn.mock.calls[0]?.[0]);
+      expect(prompt).toContain(marker);
+    });
+
+    it("includes global custom prompts", async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "spec-global-"));
+      const marker = "SPEC_GLOBAL_MARKER_67890";
+      const globalDir = path.join(tmpDir, ".autospec", "prompts", "global");
+      fs.mkdirSync(globalDir, { recursive: true });
+      fs.writeFileSync(path.join(globalDir, "context.md"), marker);
+
+      const queryFn = vi.fn().mockResolvedValue("generated contracts");
+      const handler = createSpecHandler({ queryFn });
+      const state = makeState();
+      state.project_root = tmpDir;
+      const options = makeOptions();
+
+      await handler(state, options);
+
+      const prompt = String(queryFn.mock.calls[0]?.[0]);
+      expect(prompt).toContain(marker);
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -45,6 +45,47 @@ describe("AutospecConfigSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("validates agents.parallel config", () => {
+    const config = {
+      agents: {
+        parallel: {
+          test_agents: 3,
+          implement_agents: 4,
+          docs_agents: 2,
+          sub_agent_turns_ratio: 0.5,
+        },
+      },
+    };
+    const result = AutospecConfigSchema.safeParse(config);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects agents.parallel values out of range", () => {
+    expect(
+      AutospecConfigSchema.safeParse({
+        agents: { parallel: { test_agents: 11 } },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AutospecConfigSchema.safeParse({
+        agents: { parallel: { implement_agents: -1 } },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AutospecConfigSchema.safeParse({
+        agents: { parallel: { sub_agent_turns_ratio: 1.5 } },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AutospecConfigSchema.safeParse({
+        agents: { parallel: { sub_agent_turns_ratio: 0.05 } },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("DEFAULT_CONFIG", () => {
@@ -56,6 +97,13 @@ describe("DEFAULT_CONFIG", () => {
     expect(DEFAULT_CONFIG.gates.type).toBe("review");
     expect(DEFAULT_CONFIG.agents.interviewer.min_questions).toBe(1);
     expect(DEFAULT_CONFIG.agents.interviewer.max_turns).toBe(10);
+  });
+
+  it("has expected agents.parallel defaults", () => {
+    expect(DEFAULT_CONFIG.agents.parallel.test_agents).toBe(0);
+    expect(DEFAULT_CONFIG.agents.parallel.implement_agents).toBe(0);
+    expect(DEFAULT_CONFIG.agents.parallel.docs_agents).toBe(2);
+    expect(DEFAULT_CONFIG.agents.parallel.sub_agent_turns_ratio).toBe(0.5);
   });
 });
 
@@ -82,6 +130,27 @@ describe("loadConfig", () => {
     // Other defaults preserved
     expect(config.pipeline.max_turns.implement).toBe(12);
     expect(config.gates.type).toBe("review");
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("reads and merges agents.parallel from config", () => {
+    const tmpDir = makeTmpDir();
+    const autospecDir = path.join(tmpDir, ".autospec");
+    fs.mkdirSync(autospecDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(autospecDir, "autospec.yaml"),
+      `agents:\n  parallel:\n    implement_agents: 4\n    test_agents: 3\n`,
+    );
+
+    const config = loadConfig(tmpDir);
+    expect(config.agents.parallel.implement_agents).toBe(4);
+    expect(config.agents.parallel.test_agents).toBe(3);
+    // Defaults preserved for unspecified fields
+    expect(config.agents.parallel.docs_agents).toBe(2);
+    expect(config.agents.parallel.sub_agent_turns_ratio).toBe(0.5);
+    // Other agent config preserved
+    expect(config.agents.interviewer.min_questions).toBe(1);
 
     fs.rmSync(tmpDir, { recursive: true });
   });
